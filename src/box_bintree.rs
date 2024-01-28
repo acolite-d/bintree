@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
-use std::iter::{FromIterator, IntoIterator};
-use std::mem;
-use std::ptr;
+// use std::iter::{FromIterator, IntoIterator};
+// use std::mem;
+// use std::ptr;
 
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -81,7 +81,7 @@ where
     pub fn pop(&mut self) -> Option<T> {
         if let Some(root) = self.root.as_deref_mut() {
             
-            let mut next_node = get_mut_ref_left(root);
+            let next_node = get_mut_ref_left(root);
 
             let res = next_node.take().map(|n| n.item);
             if res.is_none() { println!("is none")}

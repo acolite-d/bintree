@@ -50,13 +50,12 @@ impl<T: Ord> BinaryTree<T> {
     }
 
     pub fn insert(&mut self, val: T) {
-        let curr_node = self.root.borrow();
 
-        while let Some(next) = curr_node.as_ref() {
-            curr_node = next.left;
-        }
-        
+        todo!()
+        // let curr_node = self.root.borrow();
+
+        // while let Some(next) = curr_node.as_ref() {
+        //     curr_node = next.left;
+        // }
     }
-
-
 }

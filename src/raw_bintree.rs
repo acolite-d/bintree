@@ -200,9 +200,7 @@ impl<T: Ord> FromIterator<T> for BinaryTree<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut tree: BinaryTree<T> = Self::new();
 
-        for val in iter {
-            tree.insert(val);
-        }
+        iter.into_iter().for_each(|item| tree.insert(item));
 
         tree
     }
@@ -218,11 +216,22 @@ mod test {
         let new     = BinaryTree::<i32>::new();
 
         let vec     = vec!(-1,0,1,2,3);
-        let collect: BinaryTree<i32> = BinaryTree::from_iter(vec);
+        // let collect: BinaryTree<i32> = BinaryTree::from_iter(vec);
         // let cloned  = collect.clone();
 
         assert_eq!(default, new);
     }
+
+    // #[test]
+    // fn test_coercing() {
+    //     let mut tree = BinaryTree::<u8>::new();
+
+    //     tree.insert(1);
+    //     tree.insert(2);
+    //     tree.insert(3);
+
+    //     assert_eq!(tree.remove_inorder(), Some(1));
+    // }
 
     #[test]
     fn test_inserting() {
@@ -284,8 +293,7 @@ mod test {
         tree.insert('a');
         tree.insert('d');
 
-
-        // non-consuming iterator
+        // Non-consuming iterator
         for (test_val, tree_val) in ['a', 'd', 'j'].iter().zip(tree.iter()) {
             assert_eq!(test_val, tree_val)
         }
