@@ -1,0 +1,5 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./box_bintree/Cargo.toml"
+    ]
+}

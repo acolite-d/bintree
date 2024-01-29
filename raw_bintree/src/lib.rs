@@ -9,16 +9,14 @@ macro_rules! alloc_node {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct TreeNode<T: Ord>
-{
+struct TreeNode<T: Ord> {
     item: T,
     left: *mut TreeNode<T>,
     right: *mut TreeNode<T>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct BinaryTree<T: Ord>
-{
+pub struct BinaryTree<T: Ord> {
     root: *mut TreeNode<T>,
     size: usize,
 }
@@ -60,32 +58,32 @@ where
     }
 
     pub fn insert(&mut self, new_item: T) {
-
         // Iterate down the tree, find the leaf has the NULL child
         // to replace with the new target item.
 
         if self.root.is_null() {
             self.root = alloc_node!(new_item);
         } else {
-
             let mut next_node = self.root;
             let mut curr_node = ptr::null_mut::<TreeNode<T>>();
-    
+
             while !next_node.is_null() {
                 curr_node = next_node;
                 let curr_val = unsafe { &(*curr_node).item };
-    
+
                 next_node = match new_item.cmp(curr_val) {
                     Ordering::Greater => unsafe { (*curr_node).right },
                     Ordering::Less | Ordering::Equal => unsafe { (*curr_node).left },
                 };
             }
-    
+
             let curr_val = unsafe { &(*curr_node).item };
-    
+
             match new_item.cmp(curr_val) {
-                Ordering::Greater => unsafe { (*curr_node).right = alloc_node!(new_item) }
-                Ordering::Less | Ordering::Equal => unsafe { (*curr_node).left = alloc_node!(new_item) }
+                Ordering::Greater => unsafe { (*curr_node).right = alloc_node!(new_item) },
+                Ordering::Less | Ordering::Equal => unsafe {
+                    (*curr_node).left = alloc_node!(new_item)
+                },
             }
         }
 
@@ -124,7 +122,7 @@ where
                 }
 
                 ptr::drop_in_place(curr_node);
-                
+
                 Some(item)
             }
         } else {
@@ -142,14 +140,14 @@ where
                 true => None,
                 false => unsafe { self.root.as_ref() },
             },
-            node_stack: vec![]
+            node_stack: vec![],
         }
     }
 }
 
 impl<T: Ord> Drop for BinaryTree<T> {
     fn drop(&mut self) {
-        while let Some(_) = self.remove_inorder() { }
+        while let Some(_) = self.remove_inorder() {}
     }
 }
 
@@ -172,7 +170,6 @@ impl<'tree, T: Ord> Iterator for InorderIter<'tree, T> {
     type Item = &'tree T;
 
     fn next(&mut self) -> Option<Self::Item> {
-
         while let Some(node) = self.curr_node {
             self.curr_node = unsafe { node.left.as_ref() };
             self.node_stack.push(node);
@@ -213,9 +210,9 @@ mod test {
     #[test]
     fn test_constructing() {
         let default = BinaryTree::<i32>::default();
-        let new     = BinaryTree::<i32>::new();
+        let new = BinaryTree::<i32>::new();
 
-        let vec     = vec!(-1,0,1,2,3);
+        let vec = vec![-1, 0, 1, 2, 3];
         // let collect: BinaryTree<i32> = BinaryTree::from_iter(vec);
         // let cloned  = collect.clone();
 
@@ -298,7 +295,7 @@ mod test {
             assert_eq!(test_val, tree_val)
         }
 
-        // Consuming 
+        // Consuming
         for (test_val, tree_val) in ['a', 'd', 'j'].into_iter().zip(tree) {
             assert_eq!(test_val, tree_val)
         }

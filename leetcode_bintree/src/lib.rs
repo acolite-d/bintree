@@ -1,6 +1,6 @@
-use std::rc::Rc;
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::cmp::Ordering;
+use std::rc::Rc;
 
 type TreeLink<T> = Rc<RefCell<Option<TreeNode<T>>>>;
 
@@ -24,7 +24,7 @@ struct TreeNode<T: Ord> {
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct BinaryTree<T: Ord> {
     root: TreeLink<T>,
-    size: usize
+    size: usize,
 }
 
 impl<T: Ord> TreeNode<T> {
@@ -32,7 +32,7 @@ impl<T: Ord> TreeNode<T> {
         Self {
             val,
             left: alloc_node!(),
-            right: alloc_node!()
+            right: alloc_node!(),
         }
     }
 }
@@ -41,7 +41,7 @@ impl<T: Ord> BinaryTree<T> {
     pub fn new() -> Self {
         Self {
             root: alloc_node!(),
-            size: 0
+            size: 0,
         }
     }
 
@@ -50,7 +50,6 @@ impl<T: Ord> BinaryTree<T> {
     }
 
     pub fn insert(&mut self, val: T) {
-
         todo!()
         // let curr_node = self.root.borrow();
 

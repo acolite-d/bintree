@@ -1,13 +1,6 @@
-[package]
-name = "bintree"
-version = "0.1.0"
-edition = "2021"
-
-[features]
-unique_pointer = []
-raw_pointer    = []
-g4g_pointer    = []
-
-
-[dependencies]
-cfg-if = "1.0.0"
+[workspace]
+members = [
+    "box_bintree",
+    "leetcode_bintree",
+    "raw_bintree"
+]

@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
+use std::sync::mpsc::TryRecvError;
 // use std::iter::{FromIterator, IntoIterator};
-// use std::mem;
+use std::{mem, ptr};
 // use std::ptr;
-
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct TreeNode<T: Ord> {
@@ -18,6 +18,12 @@ impl<T: Ord> TreeNode<T> {
             left: None,
             right: None,
         }
+    }
+}
+
+impl<T: Ord> From<TreeNode<T>> for Option<Box<TreeNode<T>>> {
+    fn from(node: TreeNode<T>) -> Self {
+        Some(Box::new(node))
     }
 }
 
@@ -63,34 +69,53 @@ where
     }
 
     pub fn insert(&mut self, new_item: T) {
-        if let Some(root) = self.root.as_deref_mut() {
-            let mut next_node = get_mut_ref_to_leaf(root, &new_item);
 
-            while let Some(n) = next_node {
-                next_node = get_mut_ref_to_leaf(n, &new_item);
-            }
+        let mut insert_pos = &mut self.root;
 
-            next_node.replace(Box::new(TreeNode::new(new_item)));
-        } else {
-            self.root.replace(Box::new(TreeNode::new(new_item)));
-        }
+        // {
+        //     while let Some(n) = insert_pos.as_deref_mut() {
+        //         insert_pos = match new_item.cmp(&n.item) {
+        //             Ordering::Less => &mut n.left,
+        //             Ordering::Greater => &mut n.right,
+        //             Ordering::Equal => &mut n.left,
+        //         }
+        //     }
+        // }
+
+        insert_pos.replace(TreeNode::new(new_item).into());
 
         self.size += 1;
+
+        // if let Some(curr_pos) = self.root.as_deref_mut() {
+        //     let mut next_node = get_mut_ref_to_leaf(curr_pos, &new_item);
+
+        //     while let Some(n) = next_node {
+        //         next_node = get_mut_ref_to_leaf(curr_pos, &new_item);
+        //     }
+
+        //     next_node.replace(Box::new(TreeNode::new(new_item)));
+        // } else {
+        //     self.root.replace(Box::new(TreeNode::new(new_item)));
+        // }
+
+        // self.size += 1;
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        if let Some(root) = self.root.as_deref_mut() {
-            
-            let next_node = get_mut_ref_left(root);
-
-            let res = next_node.take().map(|n| n.item);
-            if res.is_none() { println!("is none")}
-
-            res
-
-        } else {
-            None
+        if let None = self.root {
+            return None;
         }
+
+        let mut curr_node = &mut self.root;
+
+        while let Some(TreeNode {
+            left: l @ Some(_), ..
+        }) = curr_node.as_deref_mut()
+        {
+            curr_node = l
+        }
+
+        None
     }
 }
 
