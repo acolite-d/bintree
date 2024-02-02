@@ -110,7 +110,9 @@ where
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
         let popped = self.root.remove_leftmost_child().map(|n| n.item);
-        self.size -= 1;
+        
+        if popped.is_some() { self.size -= 1; }
+
         popped
     }
 }
