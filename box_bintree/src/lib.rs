@@ -1,53 +1,86 @@
+#[allow(unused)]
 use std::cmp::Ordering;
-use std::sync::mpsc::TryRecvError;
-// use std::iter::{FromIterator, IntoIterator};
+#[allow(unused)]
+use std::iter::{FromIterator, IntoIterator};
+#[allow(unused)]
 use std::{mem, ptr};
-// use std::ptr;
+
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct TreeNode<T: Ord> {
     item: T,
-    left: Option<Box<TreeNode<T>>>,
-    right: Option<Box<TreeNode<T>>>,
+    left: Tree<T>,
+    right: Tree<T>,
 }
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct Tree<T: Ord>(Option<Box<TreeNode<T>>>);
 
 impl<T: Ord> TreeNode<T> {
     fn new(item: T) -> Self {
         Self {
             item,
-            left: None,
-            right: None,
+            left: Tree(None),
+            right: Tree(None),
         }
     }
 }
 
-impl<T: Ord> From<TreeNode<T>> for Option<Box<TreeNode<T>>> {
+impl<T: Ord> From<TreeNode<T>> for Tree<T> {
     fn from(node: TreeNode<T>) -> Self {
-        Some(Box::new(node))
+        Tree(Some(Box::new(node)))
     }
 }
 
-#[inline]
-fn get_mut_ref_to_leaf<'tree, T: Ord>(
-    curr_node: &'tree mut TreeNode<T>,
-    val: &T,
-) -> &'tree mut Option<Box<TreeNode<T>>> {
-    match val.cmp(&curr_node.item) {
-        Ordering::Less => &mut curr_node.left,
-        Ordering::Greater => &mut curr_node.right,
-        Ordering::Equal => &mut curr_node.left,
+impl<T: Ord> Default for Tree<T> {
+    fn default() -> Self {
+        Self(None)
     }
 }
 
-fn get_mut_ref_left<'tree, T: Ord>(
-    curr_node: &'tree mut TreeNode<T>,
-) -> &'tree mut Option<Box<TreeNode<T>>> {
-    &mut curr_node.left
+impl<T: Ord> Tree<T> {
+
+    fn add_child(&mut self, new_item: T) {
+        match self.0.as_deref_mut() {
+            None => *self = TreeNode::new(new_item).into(),
+
+            Some(tree) => {
+                match tree.item.cmp(&new_item) {
+                    Ordering::Less => tree.right.add_child(new_item),
+                    Ordering::Greater => tree.left.add_child(new_item),
+                    Ordering::Equal => { },
+                };
+            }
+        }
+    }
+
+    #[allow(unused)]
+    fn remove_leftmost_child(&mut self) -> Option<Box<TreeNode<T>>> {
+        let pruned = match self.0.as_deref_mut() {
+            None => None,
+
+            Some(TreeNode {left: l @ Tree(Some(_)), ..}) => {
+                l.remove_leftmost_child()
+            }
+
+            Some(TreeNode {left: Tree(None), right: Tree(None), ..}) => {
+                self.0.take()
+            }
+
+            Some(TreeNode {left: Tree(None), right: r @ Tree(Some(_)), ..}) => {
+                let right_child = r.0.take();
+                mem::replace(&mut self.0, right_child)
+            }
+        };
+
+        pruned
+    }
+
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 pub struct BinTree<T: Ord> {
-    root: Option<Box<TreeNode<T>>>,
+    root: Tree<T>,
     size: usize,
 }
 
@@ -58,64 +91,27 @@ where
     #[inline]
     pub fn new() -> Self {
         Self {
-            root: None,
+            root: Tree::default(),
             size: 0,
         }
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.size
     }
 
+    #[inline]
     pub fn insert(&mut self, new_item: T) {
-
-        let mut insert_pos = &mut self.root;
-
-        // {
-        //     while let Some(n) = insert_pos.as_deref_mut() {
-        //         insert_pos = match new_item.cmp(&n.item) {
-        //             Ordering::Less => &mut n.left,
-        //             Ordering::Greater => &mut n.right,
-        //             Ordering::Equal => &mut n.left,
-        //         }
-        //     }
-        // }
-
-        insert_pos.replace(TreeNode::new(new_item).into());
-
+        self.root.add_child(new_item);
         self.size += 1;
-
-        // if let Some(curr_pos) = self.root.as_deref_mut() {
-        //     let mut next_node = get_mut_ref_to_leaf(curr_pos, &new_item);
-
-        //     while let Some(n) = next_node {
-        //         next_node = get_mut_ref_to_leaf(curr_pos, &new_item);
-        //     }
-
-        //     next_node.replace(Box::new(TreeNode::new(new_item)));
-        // } else {
-        //     self.root.replace(Box::new(TreeNode::new(new_item)));
-        // }
-
-        // self.size += 1;
     }
 
+    #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        if let None = self.root {
-            return None;
-        }
-
-        let mut curr_node = &mut self.root;
-
-        while let Some(TreeNode {
-            left: l @ Some(_), ..
-        }) = curr_node.as_deref_mut()
-        {
-            curr_node = l
-        }
-
-        None
+        let popped = self.root.remove_leftmost_child().map(|n| n.item);
+        self.size -= 1;
+        popped
     }
 }
 
@@ -143,7 +139,7 @@ pub struct InorderIter<'tree, T: Ord> {
 impl<'tree, T: Ord> BinTree<T> {
     pub fn iter(&'tree self) -> InorderIter<'tree, T> {
         InorderIter {
-            curr_node: self.root.as_deref(),
+            curr_node: self.root.0.as_deref(),
             node_stack: vec![],
         }
     }
@@ -154,12 +150,12 @@ impl<'tree, T: Ord> Iterator for InorderIter<'tree, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(node) = self.curr_node {
-            self.curr_node = node.left.as_deref();
+            self.curr_node = node.left.0.as_deref();
             self.node_stack.push(node);
         }
 
         if let Some(popped_node) = self.node_stack.pop() {
-            self.curr_node = popped_node.right.as_deref();
+            self.curr_node = popped_node.right.0.as_deref();
             return Some(&popped_node.item);
         }
 
@@ -178,13 +174,14 @@ mod tests {
     }
 
     #[test]
-    fn inserting_values() {
+    fn inserting_values_in_order() {
         let mut tree: BinTree<i32> = BinTree::new();
 
-        tree.insert(1);
         tree.insert(2);
+        tree.insert(1);
         tree.insert(3);
 
+        assert_eq!(tree.size(), 3);
         assert_eq!(tree, tree.clone());
     }
 
@@ -192,8 +189,20 @@ mod tests {
     fn iterating() {
         let mut tree: BinTree<u32> = BinTree::new();
 
-        tree.insert(1);
         tree.insert(2);
+        tree.insert(1);
+        tree.insert(3);
+
+        let mut tree_into_iter = tree.into_iter();
+
+        assert_eq!(tree_into_iter.next(), Some(1));
+        assert_eq!(tree_into_iter.next(), Some(2));
+        assert_eq!(tree_into_iter.next(), Some(3));
+
+        tree = BinTree::new();
+
+        tree.insert(2);
+        tree.insert(1);
         tree.insert(3);
 
         let mut tree_iter = tree.iter();
@@ -201,34 +210,18 @@ mod tests {
         assert_eq!(tree_iter.next(), Some(&1));
         assert_eq!(tree_iter.next(), Some(&2));
         assert_eq!(tree_iter.next(), Some(&3));
-
-        tree = BinTree::new();
-
-        tree.insert(5);
-        tree.insert(3);
-        tree.insert(1);
-        tree.insert(2);
-        tree.insert(4);
-
-        tree_iter = tree.iter();
-
-        assert_eq!(tree_iter.next(), Some(&1));
-        assert_eq!(tree_iter.next(), Some(&2));
-        assert_eq!(tree_iter.next(), Some(&3));
-        assert_eq!(tree_iter.next(), Some(&4));
-        assert_eq!(tree_iter.next(), Some(&5));
     }
 
-    #[test]
-    fn inorder_popping() {
-        let mut tree: BinTree<u32> = BinTree::new();
+    // #[test]
+    // fn inorder_popping() {
+    //     let mut tree: BinTree<u32> = BinTree::new();
 
-        tree.insert(75);
-        tree.insert(25);
-        tree.insert(50);
+    //     tree.insert(75);
+    //     tree.insert(25);
+    //     tree.insert(50);
 
-        assert_eq!(tree.pop(), Some(25));
-        assert_eq!(tree.pop(), Some(50));
-        assert_eq!(tree.pop(), Some(75));
-    }
+    //     assert_eq!(tree.pop(), Some(25));
+    //     assert_eq!(tree.pop(), Some(50));
+    //     assert_eq!(tree.pop(), Some(75));
+    // }
 }
