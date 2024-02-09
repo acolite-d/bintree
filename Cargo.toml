@@ -4,3 +4,4 @@ members = [
     "leetcode_bintree",
     "raw_bintree"
 ]
+resolver = "2"
