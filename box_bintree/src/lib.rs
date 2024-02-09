@@ -1,10 +1,6 @@
-#[allow(unused)]
 use std::cmp::Ordering;
-#[allow(unused)]
 use std::iter::{FromIterator, IntoIterator};
-#[allow(unused)]
-use std::{mem, ptr};
-
+use std::mem;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct TreeNode<T: Ord> {
@@ -39,7 +35,6 @@ impl<T: Ord> Default for Tree<T> {
 }
 
 impl<T: Ord> Tree<T> {
-
     fn add_child(&mut self, new_item: T) {
         match self.0.as_deref_mut() {
             None => *self = TreeNode::new(new_item).into(),
@@ -48,26 +43,32 @@ impl<T: Ord> Tree<T> {
                 match tree.item.cmp(&new_item) {
                     Ordering::Less => tree.right.add_child(new_item),
                     Ordering::Greater => tree.left.add_child(new_item),
-                    Ordering::Equal => { },
+                    Ordering::Equal => {}
                 };
             }
         }
     }
 
-    #[allow(unused)]
     fn remove_leftmost_child(&mut self) -> Option<Box<TreeNode<T>>> {
         let pruned = match self.0.as_deref_mut() {
             None => None,
 
-            Some(TreeNode {left: l @ Tree(Some(_)), ..}) => {
-                l.remove_leftmost_child()
-            }
+            Some(TreeNode {
+                left: l @ Tree(Some(_)),
+                ..
+            }) => l.remove_leftmost_child(),
 
-            Some(TreeNode {left: Tree(None), right: Tree(None), ..}) => {
-                self.0.take()
-            }
+            Some(TreeNode {
+                left: Tree(None),
+                right: Tree(None),
+                ..
+            }) => self.0.take(),
 
-            Some(TreeNode {left: Tree(None), right: r @ Tree(Some(_)), ..}) => {
+            Some(TreeNode {
+                left: Tree(None),
+                right: r @ Tree(Some(_)),
+                ..
+            }) => {
                 let right_child = r.0.take();
                 mem::replace(&mut self.0, right_child)
             }
@@ -75,7 +76,6 @@ impl<T: Ord> Tree<T> {
 
         pruned
     }
-
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
@@ -109,21 +109,16 @@ where
 
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        let popped = self.root.remove_leftmost_child().map(|n| n.item);
-        
-        if popped.is_some() { self.size -= 1; }
+        let popped = self.root.remove_leftmost_child().map(|n| {
+            self.size -= 1;
+            n.item
+        });
 
         popped
     }
 }
 
 pub struct InorderIntoIter<T: Ord>(BinTree<T>);
-
-impl<T: Ord> BinTree<T> {
-    pub fn into_iter(self) -> InorderIntoIter<T> {
-        InorderIntoIter(self)
-    }
-}
 
 impl<T: Ord> Iterator for InorderIntoIter<T> {
     type Item = T;
@@ -165,6 +160,23 @@ impl<'tree, T: Ord> Iterator for InorderIter<'tree, T> {
     }
 }
 
+impl<T: Ord> IntoIterator for BinTree<T> {
+    type Item = T;
+    type IntoIter = InorderIntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        InorderIntoIter(self)
+    }
+}
+
+impl<T: Ord> FromIterator<T> for BinTree<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut tree: BinTree<T> = Self::new();
+        iter.into_iter().for_each(|item| tree.insert(item));
+        tree
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,6 +185,17 @@ mod tests {
     fn constructor() {
         let tree: BinTree<i32> = BinTree::new();
         assert_eq!(tree, tree.clone());
+
+        let tree2: BinTree<char> = BinTree::default();
+        assert_eq!(tree2, tree2.clone());
+
+        let iter = vec![20,10,30].into_iter();
+        let tree3: BinTree<u16> = iter.collect();
+        assert_eq!(tree3, tree3.clone());
+
+        for (tree_val, num) in tree3.into_iter().zip([10,20,30]) {
+            assert_eq!(tree_val, num);
+        }
     }
 
     #[test]
@@ -214,16 +237,29 @@ mod tests {
         assert_eq!(tree_iter.next(), Some(&3));
     }
 
-    // #[test]
-    // fn inorder_popping() {
-    //     let mut tree: BinTree<u32> = BinTree::new();
+    #[test]
+    fn inorder_popping_with_order() {
+        let mut tree: BinTree<u32> = BinTree::new();
 
-    //     tree.insert(75);
-    //     tree.insert(25);
-    //     tree.insert(50);
+        tree.insert(50);
+        tree.insert(25);
+        tree.insert(75);
 
-    //     assert_eq!(tree.pop(), Some(25));
-    //     assert_eq!(tree.pop(), Some(50));
-    //     assert_eq!(tree.pop(), Some(75));
-    // }
+        assert_eq!(tree.pop(), Some(25));
+        assert_eq!(tree.pop(), Some(50));
+        assert_eq!(tree.pop(), Some(75));
+    }
+
+    #[test]
+    fn send_sync() {
+
+        fn is_send<T: Send>() {}
+        fn is_sync<T: Sync>() {}
+
+        is_send::<BinTree<i32>>();
+        is_sync::<BinTree<i32>>();
+
+        is_send::<BinTree<String>>();
+        is_sync::<BinTree<String>>();
+    }
 }
