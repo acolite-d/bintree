@@ -35,14 +35,29 @@ impl<T: Ord> Default for Tree<T> {
 }
 
 impl<T: Ord> Tree<T> {
+
+    fn search(&self, target: &T) -> Option<&TreeNode<T>> {
+        match self.0.as_deref() {
+            None => None,
+
+            Some(node @ TreeNode { item, .. }) => {
+                match target.cmp(item) {
+                    Ordering::Less => node.left.search(target),
+                    Ordering::Greater => node.right.search(target),
+                    Ordering::Equal => Some(node)
+                }
+            }
+        }
+    }
+
     fn add_child(&mut self, new_item: T) {
         match self.0.as_deref_mut() {
             None => *self = TreeNode::new(new_item).into(),
 
-            Some(tree) => {
-                match tree.item.cmp(&new_item) {
-                    Ordering::Less => tree.right.add_child(new_item),
-                    Ordering::Greater => tree.left.add_child(new_item),
+            Some(node) => {
+                match new_item.cmp(&node.item) {
+                    Ordering::Less => node.left.add_child(new_item),
+                    Ordering::Greater => node.right.add_child(new_item),
                     Ordering::Equal => {}
                 };
             }
@@ -99,6 +114,11 @@ where
     #[inline]
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    #[inline]
+    pub fn search(&self, target: &T) -> Option<&T> {
+        self.root.search(target).map(|node| &node.item)
     }
 
     #[inline]
@@ -248,6 +268,19 @@ mod tests {
         assert_eq!(tree.pop(), Some(25));
         assert_eq!(tree.pop(), Some(50));
         assert_eq!(tree.pop(), Some(75));
+    }
+
+    #[test]
+    fn searching_with_order() {
+        let tree: BinTree<u8> = vec![50, 25, 75, 90, 60, 20, 5].into_iter().collect();
+
+        assert_eq!(tree.search(&50), Some(&50));
+        assert_eq!(tree.search(&5), Some(&5));
+        assert_eq!(tree.search(&90), Some(&90));
+        assert_eq!(tree.search(&60), Some(&60));
+        assert_eq!(tree.search(&20), Some(&20));
+        
+        assert_eq!(tree.search(&111), None);
     }
 
     #[test]
