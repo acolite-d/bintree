@@ -2,8 +2,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-type TreeLink<T> = Rc<RefCell<Option<TreeNode<T>>>>;
-
 macro_rules! alloc_node {
     () => {
         Rc::new(RefCell::new(None))
@@ -19,6 +17,15 @@ struct TreeNode<T: Ord> {
     val: T,
     left: TreeLink<T>,
     right: TreeLink<T>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Default)]
+struct Tree<T: Ord>(Option<Rc<RefCell<TreeNode<T>>>>);
+
+impl<T: Ord> From<TreeNode<T>> for Tree<T> {
+    fn from(value: TreeNode<T>) -> Self {
+        Some()
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]

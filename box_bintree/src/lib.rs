@@ -2,11 +2,13 @@ use std::cmp::Ordering;
 use std::iter::{FromIterator, IntoIterator};
 use std::mem;
 
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct TreeNode<T: Ord> {
     item: T,
     left: Tree<T>,
     right: Tree<T>,
+    // height: u64,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -18,6 +20,7 @@ impl<T: Ord> TreeNode<T> {
             item,
             left: Tree(None),
             right: Tree(None),
+            // height: 0
         }
     }
 }
@@ -35,18 +38,15 @@ impl<T: Ord> Default for Tree<T> {
 }
 
 impl<T: Ord> Tree<T> {
-
     fn search(&self, target: &T) -> Option<&TreeNode<T>> {
         match self.0.as_deref() {
             None => None,
 
-            Some(node @ TreeNode { item, .. }) => {
-                match target.cmp(item) {
-                    Ordering::Less => node.left.search(target),
-                    Ordering::Greater => node.right.search(target),
-                    Ordering::Equal => Some(node)
-                }
-            }
+            Some(node @ TreeNode { item, .. }) => match target.cmp(item) {
+                Ordering::Less => node.left.search(target),
+                Ordering::Greater => node.right.search(target),
+                Ordering::Equal => Some(node),
+            },
         }
     }
 
@@ -60,6 +60,8 @@ impl<T: Ord> Tree<T> {
                     Ordering::Greater => node.right.add_child(new_item),
                     Ordering::Equal => {}
                 };
+
+                // node.height += 1;
             }
         }
     }
@@ -91,6 +93,65 @@ impl<T: Ord> Tree<T> {
 
         pruned
     }
+
+
+    // Given pivot point of self, replace self with right, self becomes right's left
+    // Should I take the pivot point here?
+    /*
+     *          Y
+     *        /   \
+     *       /     \
+     *      T1      X       
+     *             / \
+     *            /   \
+     *           T2    Z 
+     * 
+     * 
+     *          X
+     *        /   \
+     *       /     \
+     *      Y       Z 
+     *     / \     
+     *    T1 T2   
+     *           
+     *                 
+     * LEFT PIVOT ON Y
+     * 1. Take Y subtree
+     * 2. Take child X, take T2 as well
+     * 3. Put T2 on Y right side
+     * 4. Put Y on left side of X
+     * 5. Put the resulting subtree back on self
+     */
+
+    fn rotate_left(&mut self) {
+        let mut y = self.0.take();
+        let x: Tree<T>;
+
+        if let Some(TreeNode { right, ..}) = y.as_deref_mut() {
+            x = Tree(right.0.take());
+            *self = x;
+        }
+
+        self.0.as_deref_mut().map(|pivot| { 
+            pivot.left = Tree(y); 
+            pivot
+        });
+    }
+
+    fn rotate_right(&mut self) {
+        let mut y = self.0.take();
+        let x: Tree<T>;
+
+        if let Some(TreeNode { left, .. }) = y.as_deref_mut() {
+            x = Tree(left.0.take());
+            *self = x;
+        }
+
+        self.0.as_deref_mut().map(|pivot| { 
+            pivot.right = Tree(y); 
+            pivot
+        });
+    }
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
@@ -120,6 +181,7 @@ where
     pub fn search(&self, target: &T) -> Option<&T> {
         self.root.search(target).map(|node| &node.item)
     }
+
 
     #[inline]
     pub fn insert(&mut self, new_item: T) {
@@ -201,6 +263,32 @@ impl<T: Ord> FromIterator<T> for BinTree<T> {
 mod tests {
     use super::*;
 
+    // build_tree!()
+    // Recursive macro, but what do I need to write here
+    /*
+     * Empty Case: build_tree!() -> Tree(None)
+     * Explicit Null case: build_tree!(Nil) -> Tree(None)
+     * Single node case: build_tree!(1) -> Tree(Some(TreeNode(1)))
+     * Recursive case: build_tree!(1 (2 3)) -> t = Tree(Some(TreeNode1)); l, r = build_tree!((2 3))
+     */
+    macro_rules! build_tree {
+        () => {
+            Tree(None)
+        };
+
+        (Nil) => {
+            Tree(None)
+        };
+
+        ($val:expr) => {
+            Tree(Some(TreeNode::new($val).into()))
+        };
+
+        ($val:expr, $( $tail:tt )*) => {
+            tree.0.left = create_tree!($tail);
+        }
+    }
+
     #[test]
     fn constructor() {
         let tree: BinTree<i32> = BinTree::new();
@@ -209,11 +297,11 @@ mod tests {
         let tree2: BinTree<char> = BinTree::default();
         assert_eq!(tree2, tree2.clone());
 
-        let iter = vec![20,10,30].into_iter();
+        let iter = vec![20, 10, 30].into_iter();
         let tree3: BinTree<u16> = iter.collect();
         assert_eq!(tree3, tree3.clone());
 
-        for (tree_val, num) in tree3.into_iter().zip([10,20,30]) {
+        for (tree_val, num) in tree3.into_iter().zip([10, 20, 30]) {
             assert_eq!(tree_val, num);
         }
     }
@@ -279,13 +367,56 @@ mod tests {
         assert_eq!(tree.search(&90), Some(&90));
         assert_eq!(tree.search(&60), Some(&60));
         assert_eq!(tree.search(&20), Some(&20));
-        
+
         assert_eq!(tree.search(&111), None);
     }
 
     #[test]
-    fn send_sync() {
+    fn tree_rotating() {
 
+        // Right rotation
+        let mut tree1 = Tree(
+            Some(TreeNode::new(3u32).into())
+        );
+
+        tree1.add_child(2);
+        tree1.add_child(1);
+
+        tree1.rotate_right();
+
+        let mut tree2 = Tree(
+            Some(TreeNode::new(2u32).into())
+        );
+
+        tree2.add_child(1);
+        tree2.add_child(3);
+
+        assert_eq!(tree1, tree2);
+
+        //Left Rotation
+        tree1 = Tree(
+            Some(TreeNode::new(1u32).into())
+        );
+
+        tree1.add_child(2);
+        tree1.add_child(3);
+
+        tree1.rotate_left();
+
+        let mut tree2 = Tree(
+            Some(TreeNode::new(2u32).into())
+        );
+
+        tree2.add_child(1);
+        tree2.add_child(3);
+
+        assert_eq!(tree1, tree2);
+
+        //LR Rotation
+    }
+
+    #[test]
+    fn send_sync() {
         fn is_send<T: Send>() {}
         fn is_sync<T: Sync>() {}
 
