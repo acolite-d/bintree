@@ -38,6 +38,18 @@ impl<T: Ord> Default for Tree<T> {
 }
 
 impl<T: Ord> Tree<T> {
+    fn add_subtree_left(&mut self, subtree: Self) {
+        self.0.as_deref_mut().map(|n| {
+            n.left = subtree;
+        });
+    }
+    
+    fn add_subtree_right(&mut self, subtree: Self) {
+        self.0.as_deref_mut().map(|n| {
+            n.right = subtree;
+        });
+    }
+
     fn search(&self, target: &T) -> Option<&TreeNode<T>> {
         match self.0.as_deref() {
             None => None,
@@ -123,6 +135,7 @@ impl<T: Ord> Tree<T> {
      * 5. Put the resulting subtree back on self
      */
 
+    #[allow(unused)]
     fn rotate_left(&mut self) {
         let mut y = self.0.take();
         let x: Tree<T>;
@@ -138,6 +151,7 @@ impl<T: Ord> Tree<T> {
         });
     }
 
+    #[allow(unused)]
     fn rotate_right(&mut self) {
         let mut y = self.0.take();
         let x: Tree<T>;
@@ -272,21 +286,78 @@ mod tests {
      * Recursive case: build_tree!(1 (2 3)) -> t = Tree(Some(TreeNode1)); l, r = build_tree!((2 3))
      */
     macro_rules! build_tree {
+        ($val:expr, (($($left_tt:tt)*), ($($right_tt:tt)*))) => {
+            {
+                let mut tree: Tree<_> = TreeNode::new($val).into();
+
+                tree.add_subtree_left(build_tree!($($left_tt)*));
+                tree.add_subtree_right(build_tree!($($right_tt)*));
+                tree
+            }
+        };
+        
+        // ($val:expr, ($($left_tt:tt)*, T$right_leaf:expr)) => {
+        //     {
+        //         let mut tree: Tree<_> = TreeNode::new($val).into();
+
+        //         tree.add_subtree_left(build_tree!($($left_tt)*));
+        //         tree.add_subtree_right(build_tree!($right_leaf));
+        //         tree
+        //     }
+        // };
+
+        // ($val:expr, ($left_leaf:expr, $($right_tt:tt)*)) => {
+        //     {
+        //         let mut tree: Tree<_> = TreeNode::new($val).into();
+
+        //         tree.add_subtree_left(build_tree!($left_leaf));
+        //         tree.add_subtree_right(build_tree!($($right_tt)*));
+        //         tree
+        //     }
+        // };
+
+        // ($val:expr, ($left_leaf:expr, $right_leaf:expr)) => {
+        //     {
+        //         let mut tree: Tree<_> = TreeNode::new($val).into();
+
+        //         tree.add_subtree_left(build_tree!($left_leaf));
+        //         tree.add_subtree_right(build_tree!($right_leaf));
+        //         tree
+        //     }
+        // };
+
         () => {
             Tree(None)
         };
 
-        (Nil) => {
+        (()) => {
             Tree(None)
         };
 
         ($val:expr) => {
-            Tree(Some(TreeNode::new($val).into()))
+            TreeNode::new($val).into()
         };
+    }
 
-        ($val:expr, $( $tail:tt )*) => {
-            tree.0.left = create_tree!($tail);
-        }
+    #[test]
+    fn build_tree_macro() {
+        let empty_tree: Tree<u8> = build_tree!();
+        assert_eq!(empty_tree, Tree(None));
+
+        let just_root: Tree<u8> = build_tree!(1u8);
+        assert_eq!(just_root, TreeNode::new(1u8).into());
+
+        let macro_tree: Tree<u8> = build_tree!{
+
+            
+            2, ((1), (4, ((3), ())))
+        };
+        let mut manual_tree: Tree<u8> = TreeNode::new(2).into();
+        manual_tree.add_child(4);
+        manual_tree.add_child(1);
+        manual_tree.add_child(3);
+
+        assert_eq!(macro_tree, manual_tree);
     }
 
     #[test]
@@ -375,9 +446,9 @@ mod tests {
     fn tree_rotating() {
 
         // Right rotation
-        let mut tree1 = Tree(
-            Some(TreeNode::new(3u32).into())
-        );
+        // let mut tree1: Tree<u32> = build_tree!{
+        //     3, ( (2), (1), ())
+        // };
 
         tree1.add_child(2);
         tree1.add_child(1);
@@ -394,22 +465,12 @@ mod tests {
         assert_eq!(tree1, tree2);
 
         //Left Rotation
-        tree1 = Tree(
-            Some(TreeNode::new(1u32).into())
-        );
-
-        tree1.add_child(2);
-        tree1.add_child(3);
-
+        tree1 = build_tree!{
+            1, ( (), (2, ((), (3))))
+        };
         tree1.rotate_left();
 
-        let mut tree2 = Tree(
-            Some(TreeNode::new(2u32).into())
-        );
-
-        tree2.add_child(1);
-        tree2.add_child(3);
-
+        tree2 = build_tree!(2, ( (1), (3)));
         assert_eq!(tree1, tree2);
 
         //LR Rotation
