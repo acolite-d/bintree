@@ -174,9 +174,7 @@ pub struct BinTree<T: Ord> {
     size: usize,
 }
 
-impl<T> BinTree<T>
-where
-    T: Ord,
+impl<T: Ord> BinTree<T>
 {
     #[inline]
     pub fn new() -> Self {
@@ -277,81 +275,7 @@ impl<T: Ord> FromIterator<T> for BinTree<T> {
 mod tests {
     use super::*;
 
-    // build_tree!()
-    // Recursive macro, but what do I need to write here
-    /*
-     * Empty Case: build_tree!() -> Tree(None)
-     * Explicit Null case: build_tree!(Nil) -> Tree(None)
-     * Single node case: build_tree!(1) -> Tree(Some(TreeNode(1)))
-     * Recursive case: build_tree!(1 (2 3)) -> t = Tree(Some(TreeNode1)); l, r = build_tree!((2 3))
-     */
-    macro_rules! build_tree {
-        ($val:expr, (($($left_tt:tt)*), ($($right_tt:tt)*))) => {
-            {
-                let mut tree: Tree<_> = TreeNode::new($val).into();
-
-                tree.add_subtree_left(build_tree!($($left_tt)*));
-                tree.add_subtree_right(build_tree!($($right_tt)*));
-                tree
-            }
-        };
-        
-        // ($val:expr, ($($left_tt:tt)*, T$right_leaf:expr)) => {
-        //     {
-        //         let mut tree: Tree<_> = TreeNode::new($val).into();
-
-        //         tree.add_subtree_left(build_tree!($($left_tt)*));
-        //         tree.add_subtree_right(build_tree!($right_leaf));
-        //         tree
-        //     }
-        // };
-
-        // ($val:expr, ($left_leaf:expr, $($right_tt:tt)*)) => {
-        //     {
-        //         let mut tree: Tree<_> = TreeNode::new($val).into();
-
-        //         tree.add_subtree_left(build_tree!($left_leaf));
-        //         tree.add_subtree_right(build_tree!($($right_tt)*));
-        //         tree
-        //     }
-        // };
-
-        // ($val:expr, ($left_leaf:expr, $right_leaf:expr)) => {
-        //     {
-        //         let mut tree: Tree<_> = TreeNode::new($val).into();
-
-        //         tree.add_subtree_left(build_tree!($left_leaf));
-        //         tree.add_subtree_right(build_tree!($right_leaf));
-        //         tree
-        //     }
-        // };
-
-        () => {
-            Tree(None)
-        };
-
-        (()) => {
-            Tree(None)
-        };
-
-        ($val:expr) => {
-            TreeNode::new($val).into()
-        };
-    }
-
     macro_rules! tree {
-
-        () => {
-            Tree(None) 
-        };
-
-        (n) => {
-            Tree(None) 
-        };
-
-        ($val:expr) => {
-            TreeNode::new($val).into()
-        };
 
         ($parent:expr, L {$($l_tt:tt)*}, R {$($r_tt:tt)*}) => {
             {
@@ -362,29 +286,12 @@ mod tests {
             }
         };
 
-        ($parent:expr, L $l_child:expr, R $r_child:expr) => {
-            {
-                let mut tree: Tree<_> = TreeNode::new($parent).into();
-                tree.add_subtree_left(tree!{$l_child});
-                tree.add_subtree_right(tree!{$r_child});
-                tree
-            }
-        };
-
+        
         ($parent:expr, L $l_child:expr, R {$($r_tt:tt)*}) => {
             {
                 let mut tree: Tree<_> = TreeNode::new($parent).into();
                 tree.add_subtree_left(tree!{$l_child});
                 tree.add_subtree_right(tree!{$($r_tt)*});
-                tree
-            }
-        };
-
-        ($parent:expr, L {$($l_tt:tt)*}, R N) => {
-            {
-                let mut tree: Tree<_> = TreeNode::new($parent).into();
-                tree.add_subtree_left(tree!{$($l_tt)*});
-                tree.add_subtree_right(Tree(None));
                 tree
             }
         };
@@ -397,34 +304,105 @@ mod tests {
                 tree
             }
         };
+
+        ($parent:expr, L $l_child:expr, R $r_child:expr) => {
+            {
+                let mut tree: Tree<_> = TreeNode::new($parent).into();
+                tree.add_subtree_left(tree!{$l_child});
+                tree.add_subtree_right(tree!{$r_child});
+                tree
+            }
+        };
+        
+        () => {
+            Tree(None) 
+        };
+
+        ($val:expr) => {
+            TreeNode::new($val).into()
+        };
     }
 
     #[test]
     fn build_tree_macro() {
-        let empty_tree: Tree<u8> = tree!();
-        assert_eq!(empty_tree, Tree(None));
 
-        let just_root: Tree<u8> = tree!(1u8);
-        assert_eq!(just_root, TreeNode::new(1u8).into());
+        assert_eq!(tree!{}, Tree::<u8>(None));
 
-        let simple: Tree<u8> = tree!{ 2, L 1, R N };
+        let just_root: Tree<u8> = tree!{1_u8};
+        assert_eq!(just_root, TreeNode::new(1_u8).into());
+
+        let null_on_left: Tree<u8> = tree!{ 
+            2, L {}, R 3 
+        };
         let mut manual_tree: Tree<u8> = TreeNode::new(2).into();
-        manual_tree.add_child(2);
+        manual_tree.add_child(3);
+
+        assert_eq!(null_on_left, manual_tree);
+
+        let null_on_right: Tree<u8> = tree!{
+            2, L 1, R {}
+        };
+        manual_tree = TreeNode::new(2).into();
         manual_tree.add_child(1);
 
-        assert_eq!(simple, manual_tree);
+        assert_eq!(null_on_right, manual_tree);
+
+        let children_are_subtrees: Tree<u8> = tree!{
+            5, 
+                L {
+                    3, L 2, R 4
+                }, 
+                R {
+                    7, L 6, R 8
+                }
+        };
+
+        manual_tree = TreeNode::new(5).into();
+
+        [3, 2, 4, 7, 6, 8]
+            .into_iter()
+            .for_each(|val| manual_tree.add_child(val));
+
+        assert_eq!(children_are_subtrees, manual_tree);
+
+        let skew_left = tree!{
+            5, L {
+                4, L {
+                    3, L {
+                        2, L {
+                            1, L {}, R {}
+                        }, R {}
+                    }, R {}
+                }, R {}
+            }, R {}
+        };
 
 
-        // let macro_tree: Tree<u8> = tree!{
-        //     2, L 1, R { 4, L 3 R () }
-        //     // 2, ((1), (4, ((3), ())))
-        // };
-        // let mut manual_tree: Tree<u8> = TreeNode::new(2).into();
-        // manual_tree.add_child(4);
-        // manual_tree.add_child(1);
-        // manual_tree.add_child(3);
+        manual_tree = Tree(None);
+        [5, 4, 3, 2, 1]
+            .into_iter()
+            .for_each(|val| manual_tree.add_child(val));
 
-        // assert_eq!(macro_tree, manual_tree);
+        assert_eq!(skew_left, manual_tree);
+
+        let skew_right = tree!{
+            1, L {}, R {
+                2, L {}, R {
+                    3, L {}, R {
+                        4, L {}, R {
+                            5, L {}, R {}
+                        }
+                    }
+                }
+            }
+        };
+
+        manual_tree = Tree(None);
+        [1, 2, 3, 4, 5]
+            .into_iter()
+            .for_each(|val| manual_tree.add_child(val));
+
+        assert_eq!(skew_right, manual_tree);
     }
 
     #[test]
@@ -483,65 +461,63 @@ mod tests {
         assert_eq!(tree_iter.next(), Some(&3));
     }
 
-    // #[test]
-    // fn inorder_popping_with_order() {
-    //     let mut tree: BinTree<u32> = BinTree::new();
+    #[test]
+    fn inorder_popping_with_order() {
+        let mut tree: BinTree<u32> = BinTree::new();
 
-    //     tree.insert(50);
-    //     tree.insert(25);
-    //     tree.insert(75);
+        tree.insert(50);
+        tree.insert(25);
+        tree.insert(75);
 
-    //     assert_eq!(tree.pop(), Some(25));
-    //     assert_eq!(tree.pop(), Some(50));
-    //     assert_eq!(tree.pop(), Some(75));
-    // }
+        assert_eq!(tree.pop(), Some(25));
+        assert_eq!(tree.pop(), Some(50));
+        assert_eq!(tree.pop(), Some(75));
+    }
 
-    // #[test]
-    // fn searching_with_order() {
-    //     let tree: BinTree<u8> = vec![50, 25, 75, 90, 60, 20, 5].into_iter().collect();
+    #[test]
+    fn searching_with_order() {
+        let tree: BinTree<u8> = vec![50, 25, 75, 90, 60, 20, 5].into_iter().collect();
 
-    //     assert_eq!(tree.search(&50), Some(&50));
-    //     assert_eq!(tree.search(&5), Some(&5));
-    //     assert_eq!(tree.search(&90), Some(&90));
-    //     assert_eq!(tree.search(&60), Some(&60));
-    //     assert_eq!(tree.search(&20), Some(&20));
+        assert_eq!(tree.search(&50), Some(&50));
+        assert_eq!(tree.search(&5), Some(&5));
+        assert_eq!(tree.search(&90), Some(&90));
+        assert_eq!(tree.search(&60), Some(&60));
+        assert_eq!(tree.search(&20), Some(&20));
 
-    //     assert_eq!(tree.search(&111), None);
-    // }
+        assert_eq!(tree.search(&111), None);
+    }
 
-    // #[test]
-    // fn tree_rotating() {
+    #[test]
+    fn rotating() {
 
-    //     // Right rotation
-    //     let mut tree1: Tree<u32> = build_tree!{
-    //         3, ( (2, (1), ()) ), ()
-    //     };
+        // Right rotation
+        let mut unbalanced_left: Tree<u32> = tree!{
+            3, L {2, L 1, R {} }, R {} 
+        };
 
-    //     tree1.add_child(2);
-    //     tree1.add_child(1);
+        unbalanced_left.rotate_right();
 
-    //     tree1.rotate_right();
+        assert_eq!(
+            unbalanced_left,
+            tree!{
+                2, L 1, R 3
+            }
+        );
 
-    //     let mut tree2 = Tree(
-    //         Some(TreeNode::new(2u32).into())
-    //     );
+        //Left Rotation
+        let mut unbalanced_right = tree!{
+            1, L {}, R {2, L {}, R 3}
+        };
 
-    //     tree2.add_child(1);
-    //     tree2.add_child(3);
+        unbalanced_right.rotate_left();
 
-    //     assert_eq!(tree1, tree2);
-
-    //     //Left Rotation
-    //     tree1 = build_tree!{
-    //         1, ( (), (2, ((), (3))))
-    //     };
-    //     tree1.rotate_left();
-
-    //     tree2 = build_tree!(2, ( (1), (3)));
-    //     assert_eq!(tree1, tree2);
-
-    //     //LR Rotation
-    // }
+        assert_eq!(
+            unbalanced_right,
+            tree!{
+                2, L 1, R 3
+            }
+        );
+    }
 
     #[test]
     fn send_sync() {
