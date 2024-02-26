@@ -1,52 +1,66 @@
 use std::cmp::Ordering;
+use std::fmt::Debug;
 use std::iter::{FromIterator, IntoIterator};
 use std::mem;
 
-
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct TreeNode<T: Ord> {
+struct TreeNode<T: Ord + Debug> {
     item: T,
     left: Tree<T>,
     right: Tree<T>,
-    // height: u64,
+    height: usize,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct Tree<T: Ord>(Option<Box<TreeNode<T>>>);
+struct Tree<T: Ord + Debug>(Option<Box<TreeNode<T>>>);
 
-impl<T: Ord> TreeNode<T> {
+impl<T: Ord + Debug> TreeNode<T> {
     fn new(item: T) -> Self {
         Self {
             item,
             left: Tree(None),
             right: Tree(None),
-            // height: 0
+            height: 0,
         }
     }
 }
 
-impl<T: Ord> From<TreeNode<T>> for Tree<T> {
+impl<T: Ord + Debug> From<TreeNode<T>> for Tree<T> {
     fn from(node: TreeNode<T>) -> Self {
         Tree(Some(Box::new(node)))
     }
 }
 
-impl<T: Ord> Default for Tree<T> {
+impl<T: Ord + Debug> Default for Tree<T> {
     fn default() -> Self {
         Self(None)
     }
 }
 
-impl<T: Ord> Tree<T> {
-    fn add_subtree_left(&mut self, subtree: Self) {
+impl<T: Ord + Debug> Tree<T> {
+    #[allow(unused)]
+    fn add_subtree_left(&mut self, mut subtree: Self) {
+        let subtree_height = subtree.calculate_height();
+
         self.0.as_deref_mut().map(|n| {
             n.left = subtree;
+
+            if n.height < subtree_height + 1 {
+                n.height = subtree_height + 1;
+            }
         });
     }
-    
-    fn add_subtree_right(&mut self, subtree: Self) {
+
+    #[allow(unused)]
+    fn add_subtree_right(&mut self, mut subtree: Self) {
+        let subtree_height = subtree.calculate_height();
+
         self.0.as_deref_mut().map(|n| {
             n.right = subtree;
+
+            if n.height < subtree_height + 1 {
+                n.height = subtree_height + 1;
+            }
         });
     }
 
@@ -73,8 +87,26 @@ impl<T: Ord> Tree<T> {
                     Ordering::Equal => {}
                 };
 
-                // node.height += 1;
+                node.height += 1;
             }
+        }
+
+        match self.calculate_balance() {
+            -2 => {
+                println!("Detected left skew, rotating right");
+                self.rotate_right();
+                // dbg!(&self);
+            }
+
+            2 => {
+                println!("Detected right skew, rotating left...");
+                self.rotate_left();
+                // dbg!(&self);
+            }
+
+            (-1..=1) => {}
+
+            _ => unreachable!(),
         }
     }
 
@@ -106,76 +138,133 @@ impl<T: Ord> Tree<T> {
         pruned
     }
 
-
-    // Given pivot point of self, replace self with right, self becomes right's left
-    // Should I take the pivot point here?
     /*
-     *          Y
+     *          P
      *        /   \
      *       /     \
-     *      T1      X       
+     *      T1      X
      *             / \
      *            /   \
-     *           T2    Z 
-     * 
-     * 
+     *           Y    New
+     *
+     *
      *          X
      *        /   \
      *       /     \
-     *      Y       Z 
-     *     / \     
-     *    T1 T2   
-     *           
-     *                 
-     * LEFT PIVOT ON Y
-     * 1. Take Y subtree
-     * 2. Take child X, take T2 as well
-     * 3. Put T2 on Y right side
-     * 4. Put Y on left side of X
-     * 5. Put the resulting subtree back on self
+     *      P      New
+     *     / \
+     *    T1  Y
      */
-
-    #[allow(unused)]
     fn rotate_left(&mut self) {
-        let mut y = self.0.take();
-        let x: Tree<T>;
+        let mut pivot = self.0.take();
+        let mut x: Tree<T> = Tree::default();
+        let mut y: Tree<T> = Tree::default();
 
-        if let Some(TreeNode { right, ..}) = y.as_deref_mut() {
-            x = Tree(right.0.take());
+        pivot.as_deref_mut().map(|p| {
+            let mut right_child = p.right.0.take();
+
+            let left_of_right = right_child
+                .as_deref_mut()
+                .map(|r| r.left.0.take())
+                .flatten()
+                .take();
+
+            x = Tree(right_child);
+            y = Tree(left_of_right);
+
+            p.right = y;
             *self = x;
-        }
+            p.height -= 2;
 
-        self.0.as_deref_mut().map(|pivot| { 
-            pivot.left = Tree(y); 
-            pivot
+            p
+        });
+
+        self.0.as_deref_mut().map(|x| {
+            x.left = Tree(pivot);
+            x
         });
     }
 
-    #[allow(unused)]
     fn rotate_right(&mut self) {
-        let mut y = self.0.take();
-        let x: Tree<T>;
+        let mut pivot = self.0.take();
+        let mut x: Tree<T> = Tree::default();
+        let mut y: Tree<T> = Tree::default();
 
-        if let Some(TreeNode { left, .. }) = y.as_deref_mut() {
-            x = Tree(left.0.take());
+        pivot.as_deref_mut().map(|p| {
+            let mut left_child = p.left.0.take();
+
+            let right_of_left = left_child
+                .as_deref_mut()
+                .map(|l| l.right.0.take())
+                .flatten()
+                .take();
+
+            x = Tree(left_child);
+            y = Tree(right_of_left);
+
+            p.left = y;
             *self = x;
-        }
+            p.height -= 2;
 
-        self.0.as_deref_mut().map(|pivot| { 
-            pivot.right = Tree(y); 
-            pivot
+            p
         });
+
+        self.0.as_deref_mut().map(|x| {
+            x.right = Tree(pivot);
+            x
+        });
+    }
+
+    fn calculate_balance(&self) -> i8 {
+        if let Some(TreeNode { left, right, .. }) = self.0.as_deref() {
+            right.0.as_deref().map_or(0, |n| (n.height + 1) as i8)
+                - left.0.as_deref().map_or(0, |n| (n.height + 1) as i8)
+        } else {
+            0
+        }
+    }
+
+    #[allow(unused)]
+    fn calculate_height(&mut self) -> usize {
+        let height = self.0.as_deref_mut().map_or(0, |n| {
+            let l_subtree_height = n
+                .left
+                .0
+                .as_deref_mut()
+                .map_or(0, |n| 1 + n.left.calculate_height());
+
+            let r_subtree_height = n
+                .right
+                .0
+                .as_deref_mut()
+                .map_or(0, |n| 1 + n.right.calculate_height());
+
+            match l_subtree_height.cmp(&r_subtree_height) {
+                Ordering::Less => {
+                    //println!("Changing the node with value {:?} to have height of {}", &n.item, r_subtree_height);
+                    n.height = r_subtree_height;
+                    r_subtree_height
+                }
+
+                Ordering::Greater | Ordering::Equal => {
+                    //println!("Changing the node with value {:?} to have height of {}", &n.item, l_subtree_height);
+                    n.height = l_subtree_height;
+                    l_subtree_height
+                }
+            }
+        });
+
+        height
     }
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
-pub struct BinTree<T: Ord> {
+pub struct BinTree<T: Ord + Debug> {
     root: Tree<T>,
     size: usize,
 }
 
-impl<T: Ord> BinTree<T>
-{
+impl<T: Ord + Debug> BinTree<T> {
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -190,10 +279,15 @@ impl<T: Ord> BinTree<T>
     }
 
     #[inline]
+    pub fn clear(&mut self) {
+        _ = self.root.0.take();
+        self.size = 0;
+    }
+
+    #[inline]
     pub fn search(&self, target: &T) -> Option<&T> {
         self.root.search(target).map(|node| &node.item)
     }
-
 
     #[inline]
     pub fn insert(&mut self, new_item: T) {
@@ -202,32 +296,32 @@ impl<T: Ord> BinTree<T>
     }
 
     #[inline]
-    pub fn pop(&mut self) -> Option<T> {
-        let popped = self.root.remove_leftmost_child().map(|n| {
+    pub fn remove_inorder(&mut self) -> Option<T> {
+        let removed = self.root.remove_leftmost_child().map(|n| {
             self.size -= 1;
             n.item
         });
 
-        popped
+        removed
     }
 }
 
-pub struct InorderIntoIter<T: Ord>(BinTree<T>);
+pub struct InorderIntoIter<T: Ord + Debug>(BinTree<T>);
 
-impl<T: Ord> Iterator for InorderIntoIter<T> {
+impl<T: Ord + Debug> Iterator for InorderIntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
+        self.0.remove_inorder()
     }
 }
 
-pub struct InorderIter<'tree, T: Ord> {
+pub struct InorderIter<'tree, T: Ord + Debug> {
     curr_node: Option<&'tree TreeNode<T>>,
     node_stack: Vec<&'tree TreeNode<T>>,
 }
 
-impl<'tree, T: Ord> BinTree<T> {
+impl<'tree, T: Ord + Debug> BinTree<T> {
     pub fn iter(&'tree self) -> InorderIter<'tree, T> {
         InorderIter {
             curr_node: self.root.0.as_deref(),
@@ -236,7 +330,7 @@ impl<'tree, T: Ord> BinTree<T> {
     }
 }
 
-impl<'tree, T: Ord> Iterator for InorderIter<'tree, T> {
+impl<'tree, T: Ord + Debug> Iterator for InorderIter<'tree, T> {
     type Item = &'tree T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -254,7 +348,7 @@ impl<'tree, T: Ord> Iterator for InorderIter<'tree, T> {
     }
 }
 
-impl<T: Ord> IntoIterator for BinTree<T> {
+impl<T: Ord + Debug> IntoIterator for BinTree<T> {
     type Item = T;
     type IntoIter = InorderIntoIter<Self::Item>;
 
@@ -263,7 +357,7 @@ impl<T: Ord> IntoIterator for BinTree<T> {
     }
 }
 
-impl<T: Ord> FromIterator<T> for BinTree<T> {
+impl<T: Ord + Debug> FromIterator<T> for BinTree<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut tree: BinTree<T> = Self::new();
         iter.into_iter().for_each(|item| tree.insert(item));
@@ -275,22 +369,39 @@ impl<T: Ord> FromIterator<T> for BinTree<T> {
 mod tests {
     use super::*;
 
+    impl<T: Ord + Debug> BinTree<T> {
+        fn from_raw_tree_unchecked(tree: Tree<T>) -> Self {
+            BinTree {
+                root: tree,
+                size: 0,
+            }
+        }
+    }
+
+    impl<T: Ord + Debug> Tree<T> {
+        fn add_child_unbalanced(&mut self, new_item: T) {
+            match self.0.as_deref_mut() {
+                None => *self = TreeNode::new(new_item).into(),
+    
+                Some(node) => {
+                    match new_item.cmp(&node.item) {
+                        Ordering::Less => node.left.add_child(new_item),
+                        Ordering::Greater => node.right.add_child(new_item),
+                        Ordering::Equal => {}
+                    };
+    
+                    node.height += 1;
+                }
+            }
+        }
+    }
+
     macro_rules! tree {
 
         ($parent:expr, L {$($l_tt:tt)*}, R {$($r_tt:tt)*}) => {
             {
                 let mut tree: Tree<_> = TreeNode::new($parent).into();
                 tree.add_subtree_left(tree!{$($l_tt)*});
-                tree.add_subtree_right(tree!{$($r_tt)*});
-                tree
-            }
-        };
-
-        
-        ($parent:expr, L $l_child:expr, R {$($r_tt:tt)*}) => {
-            {
-                let mut tree: Tree<_> = TreeNode::new($parent).into();
-                tree.add_subtree_left(tree!{$l_child});
                 tree.add_subtree_right(tree!{$($r_tt)*});
                 tree
             }
@@ -305,6 +416,15 @@ mod tests {
             }
         };
 
+        ($parent:expr, L $l_child:expr, R {$($r_tt:tt)*}) => {
+            {
+                let mut tree: Tree<_> = TreeNode::new($parent).into();
+                tree.add_subtree_left(tree!{$l_child});
+                tree.add_subtree_right(tree!{$($r_tt)*});
+                tree
+            }
+        };
+
         ($parent:expr, L $l_child:expr, R $r_child:expr) => {
             {
                 let mut tree: Tree<_> = TreeNode::new($parent).into();
@@ -313,9 +433,9 @@ mod tests {
                 tree
             }
         };
-        
+
         () => {
-            Tree(None) 
+            Tree(None)
         };
 
         ($val:expr) => {
@@ -325,33 +445,32 @@ mod tests {
 
     #[test]
     fn build_tree_macro() {
+        assert_eq!(tree! {}, Tree::<u8>(None));
 
-        assert_eq!(tree!{}, Tree::<u8>(None));
-
-        let just_root: Tree<u8> = tree!{1_u8};
+        let just_root: Tree<u8> = tree! {1_u8};
         assert_eq!(just_root, TreeNode::new(1_u8).into());
 
-        let null_on_left: Tree<u8> = tree!{ 
-            2, L {}, R 3 
+        let null_on_left: Tree<u8> = tree! {
+            2, L {}, R 3
         };
         let mut manual_tree: Tree<u8> = TreeNode::new(2).into();
-        manual_tree.add_child(3);
+        manual_tree.add_child_unbalanced(3);
 
         assert_eq!(null_on_left, manual_tree);
 
-        let null_on_right: Tree<u8> = tree!{
+        let null_on_right: Tree<u8> = tree! {
             2, L 1, R {}
         };
         manual_tree = TreeNode::new(2).into();
-        manual_tree.add_child(1);
+        manual_tree.add_child_unbalanced(1);
 
         assert_eq!(null_on_right, manual_tree);
 
-        let children_are_subtrees: Tree<u8> = tree!{
-            5, 
+        let children_are_subtrees: Tree<u8> = tree! {
+            5,
                 L {
                     3, L 2, R 4
-                }, 
+                },
                 R {
                     7, L 6, R 8
                 }
@@ -361,11 +480,11 @@ mod tests {
 
         [3, 2, 4, 7, 6, 8]
             .into_iter()
-            .for_each(|val| manual_tree.add_child(val));
+            .for_each(|val| manual_tree.add_child_unbalanced(val));
 
         assert_eq!(children_are_subtrees, manual_tree);
 
-        let skew_left = tree!{
+        let skew_left = tree! {
             5, L {
                 4, L {
                     3, L {
@@ -377,15 +496,14 @@ mod tests {
             }, R {}
         };
 
-
         manual_tree = Tree(None);
         [5, 4, 3, 2, 1]
             .into_iter()
-            .for_each(|val| manual_tree.add_child(val));
+            .for_each(|val| manual_tree.add_child_unbalanced(val));
 
         assert_eq!(skew_left, manual_tree);
 
-        let skew_right = tree!{
+        let skew_right = tree! {
             1, L {}, R {
                 2, L {}, R {
                     3, L {}, R {
@@ -400,7 +518,7 @@ mod tests {
         manual_tree = Tree(None);
         [1, 2, 3, 4, 5]
             .into_iter()
-            .for_each(|val| manual_tree.add_child(val));
+            .for_each(|val| manual_tree.add_child_unbalanced(val));
 
         assert_eq!(skew_right, manual_tree);
     }
@@ -423,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn inserting_values_in_order() {
+    fn inserting_values_with_established_balanced() {
         let mut tree: BinTree<i32> = BinTree::new();
 
         tree.insert(2);
@@ -462,50 +580,82 @@ mod tests {
     }
 
     #[test]
-    fn inorder_popping_with_order() {
+    fn inorder_removal_with_established_balance() {
         let mut tree: BinTree<u32> = BinTree::new();
 
         tree.insert(50);
         tree.insert(25);
         tree.insert(75);
 
-        assert_eq!(tree.pop(), Some(25));
-        assert_eq!(tree.pop(), Some(50));
-        assert_eq!(tree.pop(), Some(75));
+        assert_eq!(tree.remove_inorder(), Some(25));
+        assert_eq!(tree.remove_inorder(), Some(50));
+        assert_eq!(tree.remove_inorder(), Some(75));
     }
 
     #[test]
-    fn searching_with_order() {
-        let tree: BinTree<u8> = vec![50, 25, 75, 90, 60, 20, 5].into_iter().collect();
+    fn clearing() {
+        let mut bintree = BinTree::from_raw_tree_unchecked(tree! {
+            'B', L 'A', R 'C'
+        });
 
-        assert_eq!(tree.search(&50), Some(&50));
-        assert_eq!(tree.search(&5), Some(&5));
-        assert_eq!(tree.search(&90), Some(&90));
-        assert_eq!(tree.search(&60), Some(&60));
-        assert_eq!(tree.search(&20), Some(&20));
+        bintree.clear();
 
-        assert_eq!(tree.search(&111), None);
+        assert_eq!(bintree, BinTree::new());
+        assert_eq!(bintree.size, 0);
+    }
+
+    #[test]
+    fn searching() {
+        let tree: Tree<u32> = tree! {
+            50,
+                L {
+                    25,
+                        L {
+                            10, L 5, R 15
+                        },
+                        R {
+                            40, L 35, R 45
+                        }
+                },
+                R {
+                    75,
+                        L {
+                            60, L 65, R 70
+                        },
+                        R {
+                            90, L 95, R 85
+                        }
+                }
+        };
+
+        let bintree = BinTree::from_raw_tree_unchecked(tree);
+
+        assert_eq!(bintree.search(&75), Some(&75));
+        assert_eq!(bintree.search(&10), Some(&10));
+        assert_eq!(bintree.search(&60), Some(&60));
+        assert_eq!(bintree.search(&35), Some(&35));
+        assert_eq!(bintree.search(&100), None);
     }
 
     #[test]
     fn rotating() {
-
         // Right rotation
-        let mut unbalanced_left: Tree<u32> = tree!{
-            3, L {2, L 1, R {} }, R {} 
+        let mut unbalanced_left: Tree<u32> = tree! {
+            3, L {2, L 1, R {} }, R {}
         };
 
         unbalanced_left.rotate_right();
+        // unbalanced_left.calculate_balance();
 
         assert_eq!(
             unbalanced_left,
-            tree!{
+            tree! {
                 2, L 1, R 3
             }
         );
 
         //Left Rotation
-        let mut unbalanced_right = tree!{
+        let mut unbalanced_right = tree! {
             1, L {}, R {2, L {}, R 3}
         };
 
@@ -513,8 +663,141 @@ mod tests {
 
         assert_eq!(
             unbalanced_right,
-            tree!{
+            tree! {
                 2, L 1, R 3
+            }
+        );
+
+        //Right-Left Rotation
+        let mut zig_right_zag_left = tree! {
+            3, L {}, R {5, L 4, R {}}
+        };
+
+        if let Some(TreeNode { right, .. }) = zig_right_zag_left.0.as_deref_mut() {
+            right.rotate_right();
+        }
+
+        zig_right_zag_left.rotate_left();
+
+        assert_eq!(
+            zig_right_zag_left,
+            tree! {
+                4, L 3, R 5
+            }
+        );
+
+        // Left-Right Rotation
+        let mut zig_left_zag_right = tree! {
+            5, L { 3, L {}, R 4 }, R {}
+        };
+
+        if let Some(TreeNode { left, .. }) = zig_left_zag_right.0.as_deref_mut() {
+            left.rotate_left();
+        }
+
+        zig_left_zag_right.rotate_right();
+
+        assert_eq!(
+            zig_left_zag_right,
+            tree! {
+                4, L 3, R 5
+            }
+        );
+    }
+
+    #[test]
+    fn maintaining_balance() {
+        // References pulled from illustrations on
+        // Geeks4Geeks
+        // https://www.geeksforgeeks.org/insertion-in-an-avl-tree/
+
+        let mut balancing_tree: Tree<u32>;
+
+        // balancing_tree = tree!{
+        //     13, L {10, L {5, L 4, R 6}, R 11}, R {15, L {}, R 16}
+        // };
+
+        // Maintaining balance with a single left rotation?
+        // let mut balancing_tree = tree!{};
+
+        // balancing_tree.add_child(30);
+        // balancing_tree.add_child(40);
+        // balancing_tree.add_child(50);
+
+        // assert_eq!(
+        //     balancing_tree,
+        //     tree! {
+        //         40, L 30, R 50
+        //     }
+        // );
+
+        // // Maintaining balance with a single right rotation?
+        // balancing_tree = tree!{};
+        // balancing_tree.add_child(30);
+        // balancing_tree.add_child(20);
+        // balancing_tree.add_child(10);
+
+        // assert_eq!(
+        //     balancing_tree,
+        //     tree! {
+        //         20, L 10, R 30
+        //     }
+        // );
+
+        // balancing_tree = tree!{
+        //     13,
+        //     L {
+        //         10, L {5, L 4, R 8}, R 11
+        //     },
+        //     R {
+        //         15, L {}, R 16
+        //     }
+        // };
+
+        // References pulled from illustrations on
+        // Geeks4Geeks
+        // https://www.geeksforgeeks.org/insertion-in-an-avl-tree/
+        // balancing_tree = tree! {
+        //     30, L 5, R {35, L 32, R 40}
+        // };
+
+        // balancing_tree.add_child(45);
+
+        // assert_eq!(
+        //     balancing_tree,
+        //     tree! {
+        //         35, 
+        //         L {30, L 5, R 32},
+        //         R {40, L {}, R 45}
+        //     }
+        // );
+
+        balancing_tree = tree! {
+            13,
+            L {
+                10, L{5, L 4, R 6}, R 11
+            },
+            R {
+                15, L {}, R 16
+            }
+        };
+
+        balancing_tree.add_child(7);
+
+        dbg!(&balancing_tree);
+
+        assert_eq!(
+            balancing_tree,
+            tree! {
+                13,
+                L {
+                    6, 
+                    L {5, L 4, R {}},
+                    R {10, L 7, R 11} 
+                },
+                R {
+                    15, L {}, R 16
+                }
             }
         );
     }
