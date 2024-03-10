@@ -72,6 +72,7 @@ impl<T: Copy + Ord + Debug> Tree<T> {
                     self.0.as_deref().unwrap().item
                 );
 
+                // Left-right case
                 if self
                     .0
                     .as_deref()
@@ -80,7 +81,6 @@ impl<T: Copy + Ord + Debug> Tree<T> {
                     .filter(|n| n.item < new_item)
                     .is_some()
                 {
-                    println!("Left-right case!");
                     self.0.as_deref_mut().map(|n| {
                         n.left.rotate_left();
                         n
@@ -94,6 +94,7 @@ impl<T: Copy + Ord + Debug> Tree<T> {
             2 => {
                 println!("Left rotation, {:?} pivot", self.0.as_deref().unwrap().item);
 
+                // Right-left case
                 if self
                     .0
                     .as_deref()
@@ -183,7 +184,6 @@ impl<T: Copy + Ord + Debug> Tree<T> {
 
             p.right = y;
             *self = x;
-            // p.height -= 2;
 
             p
         });
@@ -241,13 +241,11 @@ impl<T: Copy + Ord + Debug> Tree<T> {
 
             match l_subtree_height.cmp(&r_subtree_height) {
                 Ordering::Less => {
-                    // println!("Changing the node ({:?}) with value {:?} to have height of {}", node as *const TreeNode<T>, &node.item, r_subtree_height);
                     node.height = r_subtree_height;
                     r_subtree_height
                 }
 
                 Ordering::Greater | Ordering::Equal => {
-                    // println!("Changing the node ({:?}) with value {:?} to have height of {}", node as *const TreeNode<T>, &node.item, r_subtree_height);
                     node.height = l_subtree_height;
                     l_subtree_height
                 }
@@ -385,14 +383,14 @@ mod tests {
 
                 Some(node) => {
                     match new_item.cmp(&node.item) {
-                        Ordering::Less => node.left.add_child(new_item),
-                        Ordering::Greater => node.right.add_child(new_item),
+                        Ordering::Less => node.left.add_child_unbalanced(new_item),
+                        Ordering::Greater => node.right.add_child_unbalanced(new_item),
                         Ordering::Equal => {}
                     };
-
-                    node.height += 1;
                 }
             }
+
+            self.calculate_height();
         }
 
         #[allow(unused)]
@@ -469,85 +467,88 @@ mod tests {
         };
     }
 
-    // #[test]
-    // fn build_tree_macro() {
-    //     assert_eq!(tree! {}, Tree::<u8>(None));
+    #[test]
+    fn build_tree_macro() {
+        assert_eq!(tree! {}, Tree::<u8>(None));
 
-    //     let just_root: Tree<u8> = tree! {1_u8};
-    //     assert_eq!(just_root, TreeNode::new(1_u8).into());
+        let just_root: Tree<u8> = tree! {1_u8};
+        assert_eq!(just_root, TreeNode::new(1_u8).into());
 
-    //     let null_on_left: Tree<u8> = tree! {
-    //         2, L {}, R 3
-    //     };
-    //     let mut manual_tree: Tree<u8> = TreeNode::new(2).into();
-    //     manual_tree.add_child_unbalanced(3);
+        let null_on_left: Tree<u8> = tree! {
+            2, L {}, R 3
+        };
+        let mut manual_tree: Tree<u8> = TreeNode::new(2).into();
+        manual_tree.add_child_unbalanced(3);
 
-    //     assert_eq!(null_on_left, manual_tree);
+        assert_eq!(null_on_left, manual_tree);
 
-    //     let null_on_right: Tree<u8> = tree! {
-    //         2, L 1, R {}
-    //     };
-    //     manual_tree = TreeNode::new(2).into();
-    //     manual_tree.add_child_unbalanced(1);
+        let null_on_right: Tree<u8> = tree! {
+            2, L 1, R {}
+        };
+        manual_tree = TreeNode::new(2).into();
+        manual_tree.add_child_unbalanced(1);
 
-    //     assert_eq!(null_on_right, manual_tree);
+        assert_eq!(null_on_right, manual_tree);
 
-    //     let children_are_subtrees: Tree<u8> = tree! {
-    //         5,
-    //             L {
-    //                 3, L 2, R 4
-    //             },
-    //             R {
-    //                 7, L 6, R 8
-    //             }
-    //     };
+        let children_are_subtrees: Tree<u8> = tree! {
+            5,
+                L {
+                    3, L 2, R 4
+                },
+                R {
+                    7, L 6, R 8
+                }
+        };
 
-    //     manual_tree = TreeNode::new(5).into();
+        manual_tree = TreeNode::new(5).into();
 
-    //     [3, 2, 4, 7, 6, 8]
-    //         .into_iter()
-    //         .for_each(|val| manual_tree.add_child_unbalanced(val));
+        [5, 3, 2, 4, 7, 6, 8]
+            .into_iter()
+            .for_each(|val| manual_tree.add_child_unbalanced(val));
 
-    //     assert_eq!(children_are_subtrees, manual_tree);
+        assert_eq!(children_are_subtrees, manual_tree);
 
-    //     let skew_left = tree! {
-    //         5, L {
-    //             4, L {
-    //                 3, L {
-    //                     2, L {
-    //                         1, L {}, R {}
-    //                     }, R {}
-    //                 }, R {}
-    //             }, R {}
-    //         }, R {}
-    //     };
+        let skew_left = tree! {
+            5, L {
+                4, L {
+                    3, L {
+                        2, L {
+                            1, L {}, R {}
+                        }, R {}
+                    }, R {}
+                }, R {}
+            }, R {}
+        };
 
-    //     manual_tree = Tree(None);
-    //     [5, 4, 3, 2, 1]
-    //         .into_iter()
-    //         .for_each(|val| manual_tree.add_child_unbalanced(val));
+        manual_tree = Tree(None);
+        [5, 4, 3, 2, 1]
+            .into_iter()
+            .for_each(|val| manual_tree.add_child_unbalanced(val));
 
-    //     assert_eq!(skew_left, manual_tree);
+        dbg!(&skew_left);
+        dbg!(&manual_tree);
 
-    //     let skew_right = tree! {
-    //         1, L {}, R {
-    //             2, L {}, R {
-    //                 3, L {}, R {
-    //                     4, L {}, R {
-    //                         5, L {}, R {}
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     };
+        assert_eq!(skew_left, manual_tree);
 
-    //     manual_tree = Tree(None);
-    //     [1, 2, 3, 4, 5]
-    //         .into_iter()
-    //         .for_each(|val| manual_tree.add_child_unbalanced(val));
+        let skew_right = tree! {
+            1, L {}, R {
+                2, L {}, R {
+                    3, L {}, R {
+                        4, L {}, R {
+                            5, L {}, R {}
+                        }
+                    }
+                }
+            }
+        };
 
-    //     assert_eq!(skew_right, manual_tree);
-    // }
+        manual_tree = Tree(None);
+        [1, 2, 3, 4, 5]
+            .into_iter()
+            .for_each(|val| manual_tree.add_child_unbalanced(val));
+
+        assert_eq!(skew_right, manual_tree);
+    }
 
     #[test]
     fn constructor() {
@@ -844,8 +845,6 @@ mod tests {
             }
         };
 
-        println!("added 7");
-
         balancing_tree.add_child(7);
 
         assert_eq!(
@@ -894,8 +893,5 @@ mod tests {
 
         is_send::<BinTree<i32>>();
         is_sync::<BinTree<i32>>();
-
-        // is_send::<BinTree<String>>();
-        // is_sync::<BinTree<String>>();
     }
 }
