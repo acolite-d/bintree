@@ -4,7 +4,7 @@ use std::iter::{FromIterator, IntoIterator};
 use std::mem;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct TreeNode<T: Ord + Debug> {
+struct TreeNode<T: Copy + Ord + Debug> {
     item: T,
     left: Tree<T>,
     right: Tree<T>,
@@ -12,9 +12,9 @@ struct TreeNode<T: Ord + Debug> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct Tree<T: Ord + Debug>(Option<Box<TreeNode<T>>>);
+struct Tree<T: Copy + Ord + Debug>(Option<Box<TreeNode<T>>>);
 
-impl<T: Ord + Debug> TreeNode<T> {
+impl<T: Copy + Ord + Debug> TreeNode<T> {
     fn new(item: T) -> Self {
         Self {
             item,
@@ -25,21 +25,19 @@ impl<T: Ord + Debug> TreeNode<T> {
     }
 }
 
-impl<T: Ord + Debug> From<TreeNode<T>> for Tree<T> {
+impl<T: Copy + Ord + Debug> From<TreeNode<T>> for Tree<T> {
     fn from(node: TreeNode<T>) -> Self {
         Tree(Some(Box::new(node)))
     }
 }
 
-impl<T: Ord + Debug> Default for Tree<T> {
+impl<T: Copy + Ord + Debug> Default for Tree<T> {
     fn default() -> Self {
         Self(None)
     }
 }
 
-impl<T: Ord + Debug> Tree<T> {
-
-
+impl<T: Copy + Ord + Debug> Tree<T> {
     fn search(&self, target: &T) -> Option<&TreeNode<T>> {
         match self.0.as_deref() {
             None => None,
@@ -74,21 +72,17 @@ impl<T: Ord + Debug> Tree<T> {
                     self.0.as_deref().unwrap().item
                 );
 
-                let needs_left_rotate = self
+                if self
                     .0
                     .as_deref()
                     .map(|n| n.left.0.as_deref())
                     .flatten()
-                    .map(|n| n.left.0.as_deref())
-                    .flatten()
-                    .map(|n| n.right.0.as_deref())
-                    .flatten()
-                    .is_some();
-
-                if needs_left_rotate {
-                    println!("Needed extra rotate");
+                    .filter(|n| n.item < new_item)
+                    .is_some()
+                {
+                    println!("Left-right case!");
                     self.0.as_deref_mut().map(|n| {
-                        n.right.rotate_left();
+                        n.left.rotate_left();
                         n
                     });
                 }
@@ -100,19 +94,15 @@ impl<T: Ord + Debug> Tree<T> {
             2 => {
                 println!("Left rotation, {:?} pivot", self.0.as_deref().unwrap().item);
 
-                let needs_right_rotate = self
+                if self
                     .0
                     .as_deref()
                     .map(|n| n.right.0.as_deref())
                     .flatten()
-                    .map(|n| n.right.0.as_deref())
-                    .flatten()
-                    .map(|n| n.left.0.as_deref())
-                    .flatten()
-                    .is_some();
-
-                if needs_right_rotate {
-                    println!("Needed extra rotate");
+                    .filter(|n| n.item > new_item)
+                    .is_some()
+                {
+                    println!("Right-left case!");
                     self.0.as_deref_mut().map(|n| {
                         n.right.rotate_right();
                         n
@@ -269,12 +259,12 @@ impl<T: Ord + Debug> Tree<T> {
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
-pub struct BinTree<T: Ord + Debug> {
+pub struct BinTree<T: Copy + Ord + Debug> {
     root: Tree<T>,
     size: usize,
 }
 
-impl<T: Ord + Debug> BinTree<T> {
+impl<T: Copy + Ord + Debug> BinTree<T> {
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -316,9 +306,9 @@ impl<T: Ord + Debug> BinTree<T> {
     }
 }
 
-pub struct InorderIntoIter<T: Ord + Debug>(BinTree<T>);
+pub struct InorderIntoIter<T: Copy + Ord + Debug>(BinTree<T>);
 
-impl<T: Ord + Debug> Iterator for InorderIntoIter<T> {
+impl<T: Copy + Ord + Debug> Iterator for InorderIntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -326,12 +316,12 @@ impl<T: Ord + Debug> Iterator for InorderIntoIter<T> {
     }
 }
 
-pub struct InorderIter<'tree, T: Ord + Debug> {
+pub struct InorderIter<'tree, T: Copy + Ord + Debug> {
     curr_node: Option<&'tree TreeNode<T>>,
     node_stack: Vec<&'tree TreeNode<T>>,
 }
 
-impl<'tree, T: Ord + Debug> BinTree<T> {
+impl<'tree, T: Copy + Ord + Debug> BinTree<T> {
     pub fn iter(&'tree self) -> InorderIter<'tree, T> {
         InorderIter {
             curr_node: self.root.0.as_deref(),
@@ -340,7 +330,7 @@ impl<'tree, T: Ord + Debug> BinTree<T> {
     }
 }
 
-impl<'tree, T: Ord + Debug> Iterator for InorderIter<'tree, T> {
+impl<'tree, T: Copy + Ord + Debug> Iterator for InorderIter<'tree, T> {
     type Item = &'tree T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -358,7 +348,7 @@ impl<'tree, T: Ord + Debug> Iterator for InorderIter<'tree, T> {
     }
 }
 
-impl<T: Ord + Debug> IntoIterator for BinTree<T> {
+impl<T: Copy + Ord + Debug> IntoIterator for BinTree<T> {
     type Item = T;
     type IntoIter = InorderIntoIter<Self::Item>;
 
@@ -367,7 +357,7 @@ impl<T: Ord + Debug> IntoIterator for BinTree<T> {
     }
 }
 
-impl<T: Ord + Debug> FromIterator<T> for BinTree<T> {
+impl<T: Copy + Ord + Debug> FromIterator<T> for BinTree<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut tree: BinTree<T> = Self::new();
         iter.into_iter().for_each(|item| tree.insert(item));
@@ -379,7 +369,7 @@ impl<T: Ord + Debug> FromIterator<T> for BinTree<T> {
 mod tests {
     use super::*;
 
-    impl<T: Ord + Debug> BinTree<T> {
+    impl<T: Copy + Ord + Debug> BinTree<T> {
         fn from_raw_tree_unchecked(tree: Tree<T>) -> Self {
             BinTree {
                 root: tree,
@@ -388,7 +378,7 @@ mod tests {
         }
     }
 
-    impl<T: Ord + Debug> Tree<T> {
+    impl<T: Copy + Ord + Debug> Tree<T> {
         fn add_child_unbalanced(&mut self, new_item: T) {
             match self.0.as_deref_mut() {
                 None => *self = TreeNode::new(new_item).into(),
@@ -408,23 +398,23 @@ mod tests {
         #[allow(unused)]
         fn add_subtree_left(&mut self, mut subtree: Self) {
             let subtree_height = subtree.calculate_height();
-    
+
             self.0.as_deref_mut().map(|n| {
                 n.left = subtree;
-    
+
                 if n.height < subtree_height + 1 {
                     n.height = subtree_height + 1;
                 }
             });
         }
-    
+
         #[allow(unused)]
         fn add_subtree_right(&mut self, mut subtree: Self) {
             let subtree_height = subtree.calculate_height();
-    
+
             self.0.as_deref_mut().map(|n| {
                 n.right = subtree;
-    
+
                 if n.height < subtree_height + 1 {
                     n.height = subtree_height + 1;
                 }
@@ -844,32 +834,32 @@ mod tests {
             }
         );
 
-        // balancing_tree = tree! {
-        //     13,
-        //     L {
-        //         10, L{5, L 4, R 6}, R 11
-        //     },
-        //     R {
-        //         15, L {}, R 16
-        //     }
-        // };
+        balancing_tree = tree! {
+            13,
+            L {
+                10, L{5, L 4, R 6}, R 11
+            },
+            R {
+                15, L {}, R 16
+            }
+        };
 
-        // println!("added 7");
+        println!("added 7");
 
-        // balancing_tree.add_child(7);
+        balancing_tree.add_child(7);
 
-        // assert_eq!(
-        //     balancing_tree,
-        //     tree! {
-        //         13,
-        //         L {
-        //             6, L {5, L 4, R {}}, R {10, L 7, R 11}
-        //         },
-        //         R {
-        //             15, L {}, R 16
-        //         }
-        //     }
-        // );
+        assert_eq!(
+            balancing_tree,
+            tree! {
+                13,
+                L {
+                    6, L {5, L 4, R {}}, R {10, L 7, R 11}
+                },
+                R {
+                    15, L {}, R 16
+                }
+            }
+        );
 
         balancing_tree = tree! {
             5,
@@ -905,7 +895,7 @@ mod tests {
         is_send::<BinTree<i32>>();
         is_sync::<BinTree<i32>>();
 
-        is_send::<BinTree<String>>();
-        is_sync::<BinTree<String>>();
+        // is_send::<BinTree<String>>();
+        // is_sync::<BinTree<String>>();
     }
 }
