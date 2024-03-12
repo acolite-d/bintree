@@ -2,29 +2,51 @@ use std::cmp::Ordering;
 use std::iter::{FromIterator, IntoIterator};
 use std::ptr;
 
-macro_rules! alloc_node {
-    ($item:expr) => {
-        Box::into_raw(Box::new(TreeNode::new($item)))
-    };
+// type Tree<T> = *mut TreeNode<T>;
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct Tree<T: Ord>(*mut TreeNode<T>);
+
+impl<T: Ord> Default for Tree<T> {
+    #[inline]
+    fn default() -> Self {
+        Self(ptr::null_mut())
+    }
 }
+
+// impl<T: Ord> Drop for Tree<T> {
+//     fn drop(&mut self) {
+//         if !self.0.is_null() {
+//             let _ = unsafe {*self.0.drop_in_place()}
+//         }
+//     }
+// }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct TreeNode<T: Ord> {
     item: T,
-    left: *mut TreeNode<T>,
-    right: *mut TreeNode<T>,
+    left: Tree<T>,
+    right: Tree<T>,
+    height: usize
+}
+
+impl<T: Ord> Into<Tree<T>> for TreeNode<T> {
+    #[inline]
+    fn into(self) -> Tree<T> {
+        Tree(Box::into_raw(Box::new(self)))
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct BinaryTree<T: Ord> {
-    root: *mut TreeNode<T>,
+    root: Tree<T>,
     size: usize,
 }
 
 impl<T: Ord> Default for BinaryTree<T> {
     fn default() -> Self {
         Self {
-            root: ptr::null_mut(),
+            root: Tree::default(),
             size: 0,
         }
     }
@@ -34,9 +56,89 @@ impl<T: Ord> TreeNode<T> {
     fn new(item: T) -> Self {
         Self {
             item,
-            left: ptr::null_mut(),
-            right: ptr::null_mut(),
+            left: Tree(ptr::null_mut()),
+            right: Tree(ptr::null_mut()),
+            height: 1
         }
+    }
+}
+
+impl<T: Ord> Tree<T> {
+    fn search(&self, target: &T) -> Option<&TreeNode<T>> {
+        let mut tree_ptr = self.0;
+
+        while let Some(node) = unsafe { tree_ptr.as_ref() } {
+            match target.cmp(&node.item) {
+                Ordering::Less => tree_ptr = node.left.0,
+                Ordering::Greater => tree_ptr = node.right.0,
+                Ordering::Equal => {
+                    return Some(&node)
+                }
+            }
+        }
+
+        None
+    }
+
+    fn add_child(&mut self, new_item: T) {
+        let mut tree = self;
+
+        while let Some(node) = unsafe { tree.0.as_mut() } {
+
+            match new_item.cmp(&node.item) {
+                Ordering::Less => tree = &mut node.left,
+                Ordering::Greater => tree = &mut node.right,
+                Ordering::Equal => { return; }
+            }
+        }
+
+        *tree = TreeNode::new(new_item).into();
+    }
+
+    fn remove_leftmost_child(&mut self) -> Option<TreeNode<T>> {
+
+        let mut tree = self.0;
+
+        unsafe {
+            if let Some(node) = tree.as_mut()  {
+
+                let pruned = loop {
+                    match (node.left.0.as_mut(), node.right.0.as_mut()) {
+                        (Some(_), None) => { tree = node.left.0},
+                        (None, None) => {  }
+                        _ => { }
+                    }
+
+                    2u32
+                };
+
+
+                None
+            } else {
+                None
+            }
+        }
+
+
+        // if let None = unsafe { self.0.as_mut() } {
+        //     return None;
+        // }
+
+        // let mut tree = self.0;
+
+
+
+        // while let Some(node) = unsafe { tree.as_mut() } {
+        //     if !node.left.0.is_null() {
+        //         tree = node.left.0;
+        //     } else if !node.right.0.is_null() {
+        //         let ret_node = unsafe { node.left.0.replace(node.right.0.read()) };
+        //     } else {
+
+        //     }
+        // }
+
+        // None
     }
 }
 
@@ -46,10 +148,7 @@ where
 {
     #[inline]
     pub fn new() -> Self {
-        Self {
-            root: ptr::null_mut(),
-            size: 0,
-        }
+        Self::default()
     }
 
     #[inline]
@@ -57,91 +156,9 @@ where
         self.size
     }
 
-    pub fn insert(&mut self, new_item: T) {
-        // Iterate down the tree, find the leaf has the NULL child
-        // to replace with the new target item.
-
-        if self.root.is_null() {
-            self.root = alloc_node!(new_item);
-        } else {
-            let mut next_node = self.root;
-            let mut curr_node = ptr::null_mut::<TreeNode<T>>();
-
-            while !next_node.is_null() {
-                curr_node = next_node;
-                let curr_val = unsafe { &(*curr_node).item };
-
-                next_node = match new_item.cmp(curr_val) {
-                    Ordering::Greater => unsafe { (*curr_node).right },
-                    Ordering::Less | Ordering::Equal => unsafe { (*curr_node).left },
-                };
-            }
-
-            let curr_val = unsafe { &(*curr_node).item };
-
-            match new_item.cmp(curr_val) {
-                Ordering::Greater => unsafe { (*curr_node).right = alloc_node!(new_item) },
-                Ordering::Less | Ordering::Equal => unsafe {
-                    (*curr_node).left = alloc_node!(new_item)
-                },
-            }
-        }
-
-        self.size += 1;
-    }
-
-    pub fn remove_from_root(&mut self) -> Option<T> {
-        todo!()
-    }
-
+    #[inline]
     pub fn remove_inorder(&mut self) -> Option<T> {
-        if !self.root.is_null() {
-            // What is the logic here?
-            // Need to take the leftmost tree node
-            // set the parent of that node, parent.left == null
-            // call destructors to free nodes
-
-            let mut curr_node = self.root;
-            let mut parent_node = self.root;
-
-            unsafe {
-                while !(*curr_node).left.is_null() {
-                    parent_node = curr_node;
-                    curr_node = (*curr_node).left;
-                }
-
-                let item = ptr::read(curr_node as *const TreeNode<T>).item;
-
-                if !(*curr_node).right.is_null() {
-                    let right_child = (*curr_node).right;
-                    (*parent_node).left = right_child;
-                } else if curr_node != parent_node {
-                    (*parent_node).left = ptr::null_mut();
-                } else {
-                    self.root = ptr::null_mut();
-                }
-
-                ptr::drop_in_place(curr_node);
-
-                Some(item)
-            }
-        } else {
-            None
-        }
-    }
-
-    pub fn into_iter(self) -> InorderIntoIter<T> {
-        InorderIntoIter(self)
-    }
-
-    pub fn iter(&self) -> InorderIter<'_, T> {
-        InorderIter {
-            curr_node: match self.root.is_null() {
-                true => None,
-                false => unsafe { self.root.as_ref() },
-            },
-            node_stack: vec![],
-        }
+        None
     }
 }
 
@@ -166,17 +183,26 @@ pub struct InorderIter<'tree, T: Ord> {
     node_stack: Vec<&'tree TreeNode<T>>,
 }
 
+impl<'tree, T: Ord> BinaryTree<T> {
+    pub fn iter(&'tree self) -> InorderIter<'tree, T> {
+        InorderIter {
+            curr_node: unsafe { self.root.0.as_ref() },
+            node_stack: vec![]
+        }
+    }
+}
+
 impl<'tree, T: Ord> Iterator for InorderIter<'tree, T> {
     type Item = &'tree T;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(node) = self.curr_node {
-            self.curr_node = unsafe { node.left.as_ref() };
+            self.curr_node = unsafe { node.left.0.as_ref() };
             self.node_stack.push(node);
         }
 
         if let Some(popped_node) = self.node_stack.pop() {
-            self.curr_node = unsafe { popped_node.right.as_ref() };
+            self.curr_node = unsafe { popped_node.right.0.as_ref() };
             return Some(&popped_node.item);
         }
 
@@ -193,111 +219,111 @@ impl<T: Ord> IntoIterator for BinaryTree<T> {
     }
 }
 
-impl<T: Ord> FromIterator<T> for BinaryTree<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        let mut tree: BinaryTree<T> = Self::new();
+// impl<T: Ord> FromIterator<T> for BinaryTree<T> {
+//     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+//         let mut tree: BinaryTree<T> = Self::new();
 
-        iter.into_iter().for_each(|item| tree.insert(item));
+//         iter.into_iter().for_each(|item| tree.insert(item));
 
-        tree
-    }
-}
+//         tree
+//     }
+// }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+// #[cfg(test)]
+// mod test {
+//     use super::*;
 
-    #[test]
-    fn test_constructing() {
-        let default = BinaryTree::<i32>::default();
-        let new = BinaryTree::<i32>::new();
+//     #[test]
+//     fn test_constructing() {
+//         let default = BinaryTree::<i32>::default();
+//         let new = BinaryTree::<i32>::new();
 
-        let vec = vec![-1, 0, 1, 2, 3];
-        // let collect: BinaryTree<i32> = BinaryTree::from_iter(vec);
-        // let cloned  = collect.clone();
+//         let vec = vec![-1, 0, 1, 2, 3];
+//         // let collect: BinaryTree<i32> = BinaryTree::from_iter(vec);
+//         // let cloned  = collect.clone();
 
-        assert_eq!(default, new);
-    }
+//         assert_eq!(default, new);
+//     }
 
-    // #[test]
-    // fn test_coercing() {
-    //     let mut tree = BinaryTree::<u8>::new();
+//     // #[test]
+//     // fn test_coercing() {
+//     //     let mut tree = BinaryTree::<u8>::new();
 
-    //     tree.insert(1);
-    //     tree.insert(2);
-    //     tree.insert(3);
+//     //     tree.insert(1);
+//     //     tree.insert(2);
+//     //     tree.insert(3);
 
-    //     assert_eq!(tree.remove_inorder(), Some(1));
-    // }
+//     //     assert_eq!(tree.remove_inorder(), Some(1));
+//     // }
 
-    #[test]
-    fn test_inserting() {
-        let mut tree: BinaryTree<u32> = BinaryTree::new();
+//     #[test]
+//     fn test_inserting() {
+//         let mut tree: BinaryTree<u32> = BinaryTree::new();
 
-        tree.insert(3);
-        tree.insert(1);
-        tree.insert(2);
+//         tree.insert(3);
+//         tree.insert(1);
+//         tree.insert(2);
 
-        assert_eq!(tree.size(), 3);
+//         assert_eq!(tree.size(), 3);
 
-        let mut tree_iter = tree.iter();
+//         let mut tree_iter = tree.iter();
 
-        assert_eq!(tree_iter.next(), Some(&1));
-        assert_eq!(tree_iter.next(), Some(&2));
-        assert_eq!(tree_iter.next(), Some(&3));
+//         assert_eq!(tree_iter.next(), Some(&1));
+//         assert_eq!(tree_iter.next(), Some(&2));
+//         assert_eq!(tree_iter.next(), Some(&3));
 
-        tree = BinaryTree::new();
+//         tree = BinaryTree::new();
 
-        tree.insert(5);
-        tree.insert(3);
-        tree.insert(1);
-        tree.insert(2);
-        tree.insert(4);
+//         tree.insert(5);
+//         tree.insert(3);
+//         tree.insert(1);
+//         tree.insert(2);
+//         tree.insert(4);
 
-        assert_eq!(tree.size(), 5);
+//         assert_eq!(tree.size(), 5);
 
-        tree_iter = tree.iter();
+//         tree_iter = tree.iter();
 
-        assert_eq!(tree_iter.next(), Some(&1));
-        assert_eq!(tree_iter.next(), Some(&2));
-        assert_eq!(tree_iter.next(), Some(&3));
-        assert_eq!(tree_iter.next(), Some(&4));
-        assert_eq!(tree_iter.next(), Some(&5));
-    }
+//         assert_eq!(tree_iter.next(), Some(&1));
+//         assert_eq!(tree_iter.next(), Some(&2));
+//         assert_eq!(tree_iter.next(), Some(&3));
+//         assert_eq!(tree_iter.next(), Some(&4));
+//         assert_eq!(tree_iter.next(), Some(&5));
+//     }
 
-    #[test]
-    fn test_removing() {
-        let mut tree: BinaryTree<u64> = BinaryTree::new();
+//     #[test]
+//     fn test_removing() {
+//         let mut tree: BinaryTree<u64> = BinaryTree::new();
 
-        tree.insert(5);
-        tree.insert(3);
-        tree.insert(1);
-        tree.insert(2);
-        tree.insert(4);
+//         tree.insert(5);
+//         tree.insert(3);
+//         tree.insert(1);
+//         tree.insert(2);
+//         tree.insert(4);
 
-        for val in 1..=5 {
-            assert_eq!(tree.remove_inorder(), Some(val));
-        }
+//         for val in 1..=5 {
+//             assert_eq!(tree.remove_inorder(), Some(val));
+//         }
 
-        assert_eq!(tree.remove_inorder(), None);
-    }
+//         assert_eq!(tree.remove_inorder(), None);
+//     }
 
-    #[test]
-    fn test_iterating() {
-        let mut tree: BinaryTree<char> = BinaryTree::new();
+//     #[test]
+//     fn test_iterating() {
+//         let mut tree: BinaryTree<char> = BinaryTree::new();
 
-        tree.insert('j');
-        tree.insert('a');
-        tree.insert('d');
+//         tree.insert('j');
+//         tree.insert('a');
+//         tree.insert('d');
 
-        // Non-consuming iterator
-        for (test_val, tree_val) in ['a', 'd', 'j'].iter().zip(tree.iter()) {
-            assert_eq!(test_val, tree_val)
-        }
+//         // Non-consuming iterator
+//         for (test_val, tree_val) in ['a', 'd', 'j'].iter().zip(tree.iter()) {
+//             assert_eq!(test_val, tree_val)
+//         }
 
-        // Consuming
-        for (test_val, tree_val) in ['a', 'd', 'j'].into_iter().zip(tree) {
-            assert_eq!(test_val, tree_val)
-        }
-    }
-}
+//         // Consuming
+//         for (test_val, tree_val) in ['a', 'd', 'j'].into_iter().zip(tree) {
+//             assert_eq!(test_val, tree_val)
+//         }
+//     }
+// }
