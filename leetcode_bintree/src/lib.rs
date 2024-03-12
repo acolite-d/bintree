@@ -2,35 +2,26 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-macro_rules! alloc_node {
-    () => {
-        Rc::new(RefCell::new(None))
-    };
-
-    ($val:expr) => {
-        Rc::new(RefCell::new(TreeNode::new($val)))
-    };
-}
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 struct TreeNode<T: Ord> {
     val: T,
-    left: TreeLink<T>,
-    right: TreeLink<T>,
+    left: Tree<T>,
+    right: Tree<T>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 struct Tree<T: Ord>(Option<Rc<RefCell<TreeNode<T>>>>);
 
 impl<T: Ord> From<TreeNode<T>> for Tree<T> {
-    fn from(value: TreeNode<T>) -> Self {
-        Some()
+    fn from(tree_node: TreeNode<T>) -> Self {
+        Tree(Some(Rc::new(RefCell::new(tree_node))))
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct BinaryTree<T: Ord> {
-    root: TreeLink<T>,
+    root: Tree<T>,
     size: usize,
 }
 
@@ -38,8 +29,8 @@ impl<T: Ord> TreeNode<T> {
     fn new(val: T) -> Self {
         Self {
             val,
-            left: alloc_node!(),
-            right: alloc_node!(),
+            left: Tree::default(),
+            right: Tree::default(),
         }
     }
 }
@@ -47,7 +38,7 @@ impl<T: Ord> TreeNode<T> {
 impl<T: Ord> BinaryTree<T> {
     pub fn new() -> Self {
         Self {
-            root: alloc_node!(),
+            root: Tree::default(),
             size: 0,
         }
     }
@@ -58,10 +49,5 @@ impl<T: Ord> BinaryTree<T> {
 
     pub fn insert(&mut self, val: T) {
         todo!()
-        // let curr_node = self.root.borrow();
-
-        // while let Some(next) = curr_node.as_ref() {
-        //     curr_node = next.left;
-        // }
     }
 }
