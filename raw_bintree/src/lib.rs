@@ -102,14 +102,16 @@ impl<T: Ord> Tree<T> {
         unsafe {
             if let Some(node) = tree.as_mut()  {
 
-                let pruned = loop {
+                loop {
                     match (node.left.0.as_mut(), node.right.0.as_mut()) {
-                        (Some(_), None) => { tree = node.left.0},
-                        (None, None) => {  }
-                        _ => { }
-                    }
+                        (Some(_), _) => tree = node.left.0 ,
 
-                    2u32
+                        (None, None) => break,
+
+                        (None, Some(_)) => { 
+                            node.left.0.replace(node.right.0.read());
+                        }
+                    }
                 };
 
 

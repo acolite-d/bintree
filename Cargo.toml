@@ -2,6 +2,8 @@
 members = [
     "box_bintree",
     "leetcode_bintree",
-    "raw_bintree"
+    "raw_bintree",
+    "box_bintree_iterative",
+    "walking"
 ]
 resolver = "2"

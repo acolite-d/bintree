@@ -232,7 +232,6 @@ impl<T: Copy + Ord + Debug> Tree<T> {
         }
     }
 
-    #[allow(unused)]
     fn calculate_height(&mut self) -> usize {
         let height = self.0.as_deref_mut().map_or(0, |node| {
             let l_subtree_height = 1 + node.left.calculate_height();
